@@ -1,3 +1,5 @@
+import entity.Battle;
+
 import javax.imageio.*;
 import javax.imageio.stream.ImageInputStream;
 import org.w3c.dom.Node;
@@ -64,10 +66,6 @@ public class FFBE_API {
             .build();
 
     public GameAssets load() throws Exception {
-        GameAssets game = new GameAssets();
-
-        game.background = image("battle_bg/battle_bg_0002_02.jpg");
-
         List<Battle.Fighter> heroes = new ArrayList<>();
         List<Battle.Fighter> enemies = new ArrayList<>();
 
@@ -75,27 +73,13 @@ public class FFBE_API {
             int[] s = HERO_STATS[i];
 
             Battle.Fighter fighter = new Battle.Fighter(
+                    "hero-" + i, HERO_IDS[i],
                     HERO_NAMES[i],
                     true,
                     s[0], s[1], s[2], s[3]
             );
 
-            GameAssets.Art art = new GameAssets.Art();
-
-            String prefix =
-                    "animated_gifs/unit_" + HERO_IDS[i] + "_";
-
-            art.idle = gif(prefix + "1idle_opac.gif");
-            art.move = gif(prefix + "2move_opac.gif");
-            art.attack = gif(prefix + "3atk_opac.gif");
-            art.dead = gif(prefix + "dead_opac.gif");
-
-            art.portrait = image(
-                    "unit_icons/unit_icon_" + HERO_IDS[i] + ".png"
-            );
-
             heroes.add(fighter);
-            game.art.put(fighter, art);
         }
 
         List<String> pool =
@@ -107,6 +91,7 @@ public class FFBE_API {
             String id = pool.get(i);
 
             Battle.Fighter fighter = new Battle.Fighter(
+                    "enemy-" + i, id,
                     "Monster " + (i + 1),
                     false,
                     105 + i * 12,
@@ -115,6 +100,40 @@ public class FFBE_API {
                     55 + i * 12
             );
 
+            enemies.add(fighter);
+        }
+
+        return load(new Battle(heroes, enemies));
+    }
+
+    /** Loads art for the saved identities without rerolling monsters or turn order. */
+    public GameAssets load(Battle battle) throws Exception {
+        if (battle.players.size() > HERO_IDS.length || battle.enemies.size() > ENEMY_COUNT) {
+            throw new IOException("The saved party is too large for this encounter layout.");
+        }
+        for (Battle.Fighter fighter : battle.players) {
+            requireSupported(fighter.assetId, HERO_IDS);
+        }
+        for (Battle.Fighter fighter : battle.enemies) {
+            requireSupported(fighter.assetId, MONSTER_POOL);
+        }
+
+        GameAssets game = new GameAssets();
+        game.battle = battle;
+        game.background = image("battle_bg/battle_bg_0002_02.jpg");
+        for (Battle.Fighter fighter : battle.players) {
+            GameAssets.Art art = new GameAssets.Art();
+            String prefix = "animated_gifs/unit_" + fighter.assetId + "_";
+            art.idle = gif(prefix + "1idle_opac.gif");
+            art.move = gif(prefix + "2move_opac.gif");
+            art.attack = gif(prefix + "3atk_opac.gif");
+            art.dead = gif(prefix + "dead_opac.gif");
+            art.portrait = image("unit_icons/unit_icon_" + fighter.assetId + ".png");
+            game.art.put(fighter, art);
+        }
+
+        for (Battle.Fighter fighter : battle.enemies) {
+            String id = fighter.assetId;
             BufferedImage sheet = image(
                     "monster_animated/monster_anime_" + id + ".png"
             );
@@ -132,13 +151,15 @@ public class FFBE_API {
             art.move = art.idle;
             art.mirror = false;
 
-            enemies.add(fighter);
             game.art.put(fighter, art);
         }
-
-        game.battle = new Battle(heroes, enemies);
-
         return game;
+    }
+
+    private void requireSupported(String id, String[] supported) throws IOException {
+        if (!List.of(supported).contains(id)) {
+            throw new IOException("Unsupported fighter asset in save: " + id);
+        }
     }
 
     private byte[] bytes(String path) throws Exception {
