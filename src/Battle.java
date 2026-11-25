@@ -1,8 +1,10 @@
+import entity.ItemTarget;
+
 import java.util.*;
 
 public class Battle {
 
-    public static class Fighter {
+    public static class Fighter implements ItemTarget {
         public final String name;
         public final boolean player;
         public final int maxHp, attack, defense, speed;
@@ -20,14 +22,34 @@ public class Battle {
             this.speed = speed;
         }
 
+        @Override
         public boolean alive() {
             return hp > 0;
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public int getHp() {
+            return hp;
+        }
+
+        @Override
+        public int getMaxHp() {
+            return maxHp;
+        }
+
+        @Override
+        public void restoreHp(int amount) {
+            hp = Math.min(maxHp, hp + amount);
         }
     }
 
     public final List<Fighter> players;
     public final List<Fighter> enemies;
-    public final Item.Bag bag = new Item.Bag();
 
     private final List<Fighter> order = new ArrayList<>();
     private int cursor;
@@ -40,9 +62,6 @@ public class Battle {
 
         order.addAll(players);
         order.addAll(enemies);
-        bag.add(new Item.Healing("Potion", 30), 3);
-        bag.add(new Item.Healing("Super Potion", 70), 1);
-        bag.add(new Item.Revive(), 1);
 
         Collections.shuffle(order);
 
@@ -115,22 +134,6 @@ public class Battle {
         actor.guarding = true;
 
         return actor.name + " braces for the next hit.";
-    }
-
-    public boolean canUse(Item item, Fighter target) {
-        return !ended && target != null
-                && bag.count(item) > 0
-                && target.player == item.targetsAllies()
-                && item.canUse(target);
-    }
-
-    public String useItem(Item item, Fighter target) {
-        if (!canUse(item, target)) {
-            throw new IllegalStateException("Can't use " + item.name());
-        }
-
-        bag.consume(item);
-        return item.use(current(), target);
     }
 
     public void next() {

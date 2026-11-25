@@ -1,3 +1,8 @@
+import interface_adapter.items.ItemsViewModel;
+import view.DamagePopup;
+import view.ItemMenuView;
+import view.TurnMarker;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -95,8 +100,10 @@ public class Main extends JPanel {
             "Loading characters and animations...";
 
     private boolean choosing;
-    private boolean items;
-    private Item pendingItem;
+    private final ItemsViewModel itemsViewModel =
+            new ItemsViewModel();
+
+    private ItemMenuView itemMenu;
     private boolean hitApplied;
 
     private Point mouse = new Point(-1, -1);
@@ -120,6 +127,11 @@ public class Main extends JPanel {
     private long phaseStart;
     private long readyAt;
     private long hitAt;
+
+    private Battle.Fighter popupTarget;
+    private DamagePopup popup;
+
+    private final TurnMarker turnMarker = new TurnMarker();
 
     private final long openedAt =
             System.currentTimeMillis();
@@ -195,6 +207,15 @@ public class Main extends JPanel {
                     assets = get();
                     battle = assets.battle;
 
+                    itemMenu = ItemMenuFactory.create(
+                            battle, assets.inventory,
+                            assets.icons, itemsViewModel
+                    );
+
+                    itemsViewModel.addPropertyChangeListener(
+                            e -> itemUsed((int) e.getNewValue())
+                    );
+
                     for (Battle.Fighter f : battle.players) {
                         cacheBody(f);
                     }
@@ -261,8 +282,11 @@ public class Main extends JPanel {
 
         boolean hand = canAct()
                 && (over >= 0
-                || (!items && enemyAt(mouse) != null)
-                || (pendingItem != null && heroAt(mouse) != null));
+                || (!itemMenu.isOpen() && enemyAt(mouse) != null)
+                || (itemMenu.isOpen()
+                && itemMenu.contains(mouse, dialogueBox()))
+                || (itemMenu.hasSelection()
+                && heroAt(mouse) != null));
 
         setCursor(Cursor.getPredefinedCursor(
                 hand
@@ -278,14 +302,16 @@ public class Main extends JPanel {
 
         int action = actionAt(point);
 
-        if (items) {
-            clickItems(action, point);
+        if (itemMenu.isOpen() && action < 0) {
+            clickItems(point);
             return;
         }
 
         if (action >= 0) {
+            boolean wasOpen = itemMenu.isOpen();
+
             choosing = false;
-            items = false;
+            itemMenu.close();
 
             if (action == 0) {
                 if (target != null && target.alive()) {
@@ -302,14 +328,12 @@ public class Main extends JPanel {
                 message = battle.defend();
                 finishTurn();
 
-            } else if (action == 2) {
-                items = true;
-                pendingItem = null;
-                target = null;
+            } else if (action == 2 && wasOpen) {
+                message = battle.prompt();
 
-                message = battle.bag.available().isEmpty()
-                        ? "The bag is empty. Click Back."
-                        : "Choose an item.";
+            } else if (action == 2) {
+                target = null;
+                itemMenu.open();
 
             } else {
                 message = "Run is a placeholder for now.";
@@ -326,7 +350,7 @@ public class Main extends JPanel {
             if (choosing) {
                 startAttack(selected);
             } else {
-                items = false;
+                itemMenu.close();
 
                 message = "Target: "
                         + target.name
@@ -335,68 +359,22 @@ public class Main extends JPanel {
         }
     }
 
-    // Item menu: slots 0-2 are items, the last slot is Back.
-    private void clickItems(int action, Point point) {
-        if (action == ACTIONS.length - 1) {
-            items = false;
-            pendingItem = null;
-            message = battle.prompt();
-            return;
-        }
-
-        if (action >= 0) {
-            Item item = itemAt(action);
-
-            if (item != null) {
-                pendingItem = item;
-                message = "Click a hero to use "
-                        + item.name() + ".";
-            }
-
+    private void clickItems(Point point) {
+        if (itemMenu.select(point, dialogueBox())) {
             return;
         }
 
         Battle.Fighter hero = heroAt(point);
 
-        if (hero == null || pendingItem == null) {
-            return;
-        }
-
-        if (battle.canUse(pendingItem, hero)) {
-            message = battle.useItem(pendingItem, hero);
-            deaths.remove(hero);
-            finishTurn();
-        } else {
-            message = pendingItem.name()
-                    + " won't have any effect on "
-                    + hero.name + ".";
+        if (hero != null) {
+            itemMenu.useOn(battle.players.indexOf(hero));
         }
     }
 
-    private Item itemAt(int slot) {
-        List<Item> list = battle.bag.available();
-
-        return slot >= 0
-                && slot < ACTIONS.length - 1
-                && slot < list.size()
-                ? list.get(slot)
-                : null;
-    }
-
-    private String label(int i) {
-        if (!items) {
-            return ACTIONS[i];
-        }
-
-        if (i == ACTIONS.length - 1) {
-            return "Back";
-        }
-
-        Item item = itemAt(i);
-
-        return item == null
-                ? ""
-                : item.name() + " x" + battle.bag.count(item);
+    private void itemUsed(int heroIndex) {
+        deaths.remove(battle.players.get(heroIndex));
+        message = itemsViewModel.getMessage();
+        finishTurn();
     }
 
     // Heroes can be picked by their card or their sprite.
@@ -488,7 +466,7 @@ public class Main extends JPanel {
         target = chosen;
 
         choosing = false;
-        items = false;
+        itemMenu.close();
         hitApplied = false;
 
         phase = 1;
@@ -519,8 +497,15 @@ public class Main extends JPanel {
 
                 hitApplied = true;
 
+                int hpBefore = victim.hp;
+
                 message = battle.attack(victim);
                 hitAt = now;
+
+                popupTarget = victim;
+                popup = new DamagePopup(
+                        hpBefore - victim.hp, victim.player
+                );
 
                 if (!victim.alive()) {
                     deaths.put(victim, now);
@@ -573,8 +558,7 @@ public class Main extends JPanel {
 
         target = null;
         choosing = false;
-        items = false;
-        pendingItem = null;
+        itemMenu.close();
 
         message += "\n" + battle.prompt();
         readyAt = System.currentTimeMillis();
@@ -667,6 +651,15 @@ public class Main extends JPanel {
         );
     }
 
+    private Rectangle dialogueBox() {
+        return new Rectangle(
+                20,
+                getHeight() - 142,
+                (int) (getWidth() * .36),
+                126
+        );
+    }
+
     private Rectangle cardBox(int i) {
         int left = (int) (getWidth() * .39);
         int total = (int) (getWidth() * .59);
@@ -725,6 +718,10 @@ public class Main extends JPanel {
                 drawFighter(g, f);
             }
 
+            if (popup != null) {
+                popup.draw(g, targetBox(popupTarget));
+            }
+
             drawTracker(g);
 
             for (int i = 0;
@@ -739,20 +736,15 @@ public class Main extends JPanel {
 
         drawActions(g);
 
-        Rectangle dialogue = new Rectangle(
-                20,
-                getHeight() - 142,
-                (int) (getWidth() * .36),
-                126
-        );
+        Rectangle dialogue = dialogueBox();
 
         panel(g, dialogue, ACCENT);
 
-        wrap(
-                g,
-                (items ? "ITEMS\n" : "") + message,
-                dialogue
-        );
+        if (itemMenu != null && itemMenu.isOpen()) {
+            itemMenu.draw(g, dialogue, mouse);
+        } else {
+            wrap(g, message, dialogue);
+        }
 
         g.dispose();
     }
@@ -764,10 +756,8 @@ public class Main extends JPanel {
             Rectangle r = actionBox(i);
             float glow = hover[i];
 
-            boolean selected = enabled && (items
-                    ? pendingItem != null
-                    && itemAt(i) == pendingItem
-                    : i == 0 && choosing);
+            boolean selected = enabled
+                    && (i == 0 && choosing || i == 2 && itemMenu.isOpen());
 
             Color top = new Color(
                     21 + (int) (glow * 19),
@@ -824,9 +814,9 @@ public class Main extends JPanel {
 
             text(
                     g,
-                    selected && !items
-                            ? "Choose target..."
-                            : label(i),
+                    !selected ? ACTIONS[i]
+                            : i == 0 ? "Choose target..."
+                            : "Close items",
                     r.x + 16 + (int) (glow * 4),
                     r.y + 22,
                     16,
@@ -888,6 +878,12 @@ public class Main extends JPanel {
             if (phase == 3) {
                 mirror = !mirror;
             }
+        }
+
+        if (!battle.ended && f == battle.current()) {
+            turnMarker.draw(
+                    g, p, targetBox(f).width, f.player
+            );
         }
 
         if (canAct()
@@ -1031,8 +1027,7 @@ public class Main extends JPanel {
                 g,
                 r,
                 (!battle.ended && f == battle.current())
-                        || (pendingItem != null
-                        && battle.canUse(pendingItem, f))
+                        || itemMenu.canUseOn(index)
                         ? ACCENT
                         : new Color(79, 111, 130)
         );

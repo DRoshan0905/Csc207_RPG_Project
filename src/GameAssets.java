@@ -1,3 +1,5 @@
+import entity.Inventory;
+
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;
@@ -9,6 +11,11 @@ public class GameAssets {
     public BufferedImage background;
 
     public final Map<Battle.Fighter, Art> art = new HashMap<>();
+
+    public Inventory inventory;
+
+    // Icons by item name.
+    public final Map<String, BufferedImage> icons = new HashMap<>();
 
     public static class Art {
         public Clip idle;
