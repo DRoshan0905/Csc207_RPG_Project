@@ -1,3 +1,6 @@
+package data_access;
+
+import entity.Battle;
 import entity.Inventory;
 import entity.ItemTarget;
 import use_case.ItemDataAccessInterface;

@@ -1,3 +1,7 @@
+package data_access;
+
+import entity.Battle;
+import entity.Fighter;
 import entity.Inventory;
 
 import java.awt.*;
@@ -10,7 +14,7 @@ public class GameAssets {
     public Battle battle;
     public BufferedImage background;
 
-    public final Map<Battle.Fighter, Art> art = new HashMap<>();
+    public final Map<Fighter, Art> art = new HashMap<>();
 
     public Inventory inventory;
 
@@ -21,7 +25,10 @@ public class GameAssets {
         public Clip idle;
         public Clip move;
         public Clip attack;
+        public Clip skill;
         public Clip dead;
+
+        public Clip skillEffect;
 
         public BufferedImage portrait;
         public boolean mirror;
@@ -39,6 +46,7 @@ public class GameAssets {
 
         public Clip(BufferedImage[] frames, int[] delays,
                     double x, double y) {
+
             this.frames = frames;
             this.anchorX = x;
             this.anchorY = y;
@@ -74,6 +82,7 @@ public class GameAssets {
                          double x, double y,
                          double scale, boolean mirror,
                          long ms, boolean loop) {
+
             Graphics2D g = (Graphics2D) graphics.create();
 
             g.translate(x, y);
