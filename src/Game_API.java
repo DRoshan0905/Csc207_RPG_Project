@@ -1,3 +1,5 @@
+import entity.Battle;
+
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
@@ -38,8 +40,9 @@ public class Game_API {
                     + "sparklinlabs/superpowers-asset-packs/"
                     + "master/rpg-battle-system/";
 
-    private static final Path CACHE =
+    private static final Path DEFAULT_CACHE =
             Path.of("superpowers-cache");
+    private final Path cache;
 
     // Set to 1–24 for a specific background.
     // Set to 0 to choose randomly at startup.
@@ -93,9 +96,15 @@ public class Game_API {
             .connectTimeout(Duration.ofSeconds(20))
             .build();
 
-    public GameAssets load() throws Exception {
-        GameAssets game = new GameAssets();
+    public Game_API() {
+        this(DEFAULT_CACHE);
+    }
 
+    public Game_API(Path cache) {
+        this.cache = cache;
+    }
+
+    public GameAssets load() throws Exception {
         int background = BACKGROUND == 0
                 ? ThreadLocalRandom.current().nextInt(1, 25)
                 : BACKGROUND;
@@ -106,56 +115,65 @@ public class Game_API {
             );
         }
 
-        game.background = image(
-                "backgrounds/" + background + ".png"
-        );
-
         List<Battle.Fighter> heroes = new ArrayList<>();
         List<Battle.Fighter> enemies = new ArrayList<>();
 
         for (int i = 0; i < HERO_FOLDERS.length; i++) {
             Battle.Fighter fighter = fighter(
-                    HERO_NAMES[i], true, HERO_STATS[i]
+                    HERO_FOLDERS[i], HERO_NAMES[i], true, HERO_STATS[i]
             );
-
-            GameAssets.Art art = loadArt(
-                    "char/" + HERO_FOLDERS[i] + "/"
-            );
-
-            // Heroes face toward the enemies on the left.
-            art.mirror = false;
-
             heroes.add(fighter);
-            game.art.put(fighter, art);
         }
 
         for (int i = 0; i < ENEMY_FOLDERS.length; i++) {
             Battle.Fighter fighter = fighter(
-                    ENEMY_NAMES[i], false, ENEMY_STATS[i]
+                    ENEMY_FOLDERS[i], ENEMY_NAMES[i], false, ENEMY_STATS[i]
             );
-
-            GameAssets.Art art = loadArt(
-                    "monster/" + ENEMY_FOLDERS[i] + "/"
-            );
-
-            // These enemy sprites face toward the right.
-            art.mirror = false;
-
             enemies.add(fighter);
-            game.art.put(fighter, art);
         }
 
-        game.battle = new Battle(heroes, enemies);
+        return load(new Battle(heroes, enemies, background));
+    }
 
+    /** Reuses saved identities, turn order, stats, inventory, and background. */
+    public GameAssets load(Battle battle) throws Exception {
+        if (battle.players.size() > HERO_FOLDERS.length || battle.enemies.size() > ENEMY_FOLDERS.length) {
+            throw new IOException("The saved party is too large for this encounter layout.");
+        }
+        for (Battle.Fighter fighter : battle.players) {
+            requireSupported(fighter, true, HERO_FOLDERS);
+        }
+        for (Battle.Fighter fighter : battle.enemies) {
+            requireSupported(fighter, false, ENEMY_FOLDERS);
+        }
+        GameAssets game = new GameAssets();
+        game.battle = battle;
+        game.background = image("backgrounds/" + battle.backgroundId() + ".png");
+        for (Battle.Fighter fighter : battle.players) {
+            game.art.put(fighter, loadArt("char/" + fighter.assetId + "/"));
+        }
+        for (Battle.Fighter fighter : battle.enemies) {
+            game.art.put(fighter, loadArt("monster/" + fighter.assetId + "/"));
+        }
         return game;
     }
 
+    private void requireSupported(Battle.Fighter fighter, boolean player, String[] supported)
+            throws IOException {
+        if (fighter.player != player || !List.of(supported).contains(fighter.assetId)) {
+            throw new IOException("Unsupported fighter asset in save: " + fighter.assetId);
+        }
+    }
+
     private Battle.Fighter fighter(
+            String assetId,
             String name,
             boolean player,
             int[] stats) {
 
         return new Battle.Fighter(
+                (player ? "hero-" : "enemy-") + assetId,
+                assetId,
                 name,
                 player,
                 stats[0],
@@ -196,7 +214,7 @@ public class Game_API {
     private byte[] bytes(String relativePath)
             throws Exception {
 
-        Path file = CACHE.resolve(relativePath);
+        Path file = cache.resolve(relativePath);
 
         if (Files.isRegularFile(file)) {
             return Files.readAllBytes(file);

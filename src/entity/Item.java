@@ -1,3 +1,5 @@
+package entity;
+
 import java.util.*;
 
 public interface Item {
@@ -21,12 +23,19 @@ public interface Item {
         private final int amount;
 
         public Healing(String name, int amount) {
+            if (name == null || name.isBlank() || amount <= 0) {
+                throw new IllegalArgumentException("Invalid healing item");
+            }
             this.name = name;
             this.amount = amount;
         }
 
         public String name() {
             return name;
+        }
+
+        public int amount() {
+            return amount;
         }
 
         public boolean targetsAllies() {
@@ -68,7 +77,17 @@ public interface Item {
         private final Map<Item, Integer> counts = new LinkedHashMap<>();
 
         public void add(Item item, int qty) {
+            if (item == null || qty < 0) {
+                throw new IllegalArgumentException("Invalid inventory entry");
+            }
             counts.merge(item, qty, Integer::sum);
+        }
+
+        /** Includes empty stacks so save/continue preserves item ordering and quantities. */
+        public List<GameState.ItemState> snapshot() {
+            List<GameState.ItemState> entries = new ArrayList<>();
+            counts.forEach((item, quantity) -> entries.add(GameState.ItemState.from(item, quantity)));
+            return List.copyOf(entries);
         }
 
         public int count(Item item) {

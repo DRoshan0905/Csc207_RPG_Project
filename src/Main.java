@@ -1,3 +1,7 @@
+import entity.Battle;
+import entity.CombatLogEntry;
+import entity.Item;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -38,11 +42,11 @@ public class Main extends JPanel {
     // Decrease vertical to move higher.
 
     private static final double[][] HERO_POSITIONS = {
-            {.57, .64}, // Rain
-            {.66, .53}, // Lasswell
-            {.75, .64}, // Fina
-            {.84, .53}, // Nichol
-            {.93, .64}  // Lid
+            {.57, .64}, // Warrior
+            {.66, .53}, // Paladin
+            {.75, .64}, // Mage
+            {.84, .53}, // Bowman
+            {.93, .64}  // Wizard
     };
 
     private static final double[][] ENEMY_POSITIONS = {
@@ -83,11 +87,6 @@ public class Main extends JPanel {
             "Attack", "Defend", "Items", "Run"
     };
 
-    @FunctionalInterface
-    public interface Loader {
-        GameAssets load() throws Exception;
-    }
-
     private GameAssets assets;
     private Battle battle;
 
@@ -98,6 +97,9 @@ public class Main extends JPanel {
     private boolean items;
     private Item pendingItem;
     private boolean hitApplied;
+    private boolean paused;
+    private boolean changedSinceSave = true;
+    private Runnable checkpointAction;
 
     private Point mouse = new Point(-1, -1);
     private int pressed = -1;
@@ -126,7 +128,7 @@ public class Main extends JPanel {
 
     private final Timer timer;
 
-    public Main(Loader loader) {
+    public Main(GameAssets loaded) {
         setPreferredSize(new Dimension(WIDTH, HEIGHT));
         setBackground(new Color(10, 24, 34));
 
@@ -181,49 +183,59 @@ public class Main extends JPanel {
 
         timer.start();
 
-        new SwingWorker<GameAssets, Void>() {
-
-            @Override
-            protected GameAssets doInBackground()
-                    throws Exception {
-                return loader.load();
+        assets = loaded;
+        battle = assets.battle;
+        for (Battle.Fighter fighter : battle.players) {
+            cacheBody(fighter);
+        }
+        for (Battle.Fighter fighter : battle.enemies) {
+            cacheBody(fighter);
+        }
+        // Restored defeats should render in their finished pose, not replay a death.
+        for (Battle.Fighter fighter : bodies.keySet()) {
+            if (!fighter.alive()) {
+                deaths.put(fighter, 0L);
             }
+        }
+        List<CombatLogEntry> log = battle.log();
+        message = (battle.ended || log.isEmpty() ? "" : log.get(log.size() - 1).message() + "\n")
+                + battle.prompt();
+        readyAt = System.currentTimeMillis();
+    }
 
-            @Override
-            protected void done() {
-                try {
-                    assets = get();
-                    battle = assets.battle;
+    public Battle battle() {
+        return battle;
+    }
 
-                    for (Battle.Fighter f : battle.players) {
-                        cacheBody(f);
-                    }
+    public boolean hasUnsavedChanges() {
+        return changedSinceSave;
+    }
 
-                    for (Battle.Fighter f : battle.enemies) {
-                        cacheBody(f);
-                    }
+    public void markSaved() {
+        changedSinceSave = false;
+    }
 
-                    message = "An enemy group approaches!\n"
-                            + battle.prompt();
+    /** Called on Swing's event thread. An in-flight attack must finish first. */
+    public void atCheckpoint(Runnable action) {
+        if (paused || checkpointAction != null) {
+            throw new IllegalStateException("A checkpoint operation is already pending");
+        }
+        if (phase == 0) {
+            paused = true;
+            action.run();
+        } else {
+            checkpointAction = action;
+        }
+    }
 
-                    readyAt = System.currentTimeMillis();
-
-                } catch (Exception e) {
-                    Throwable cause = e.getCause() == null
-                            ? e
-                            : e.getCause();
-
-                    message = "Could not load assets: "
-                            + cause.getMessage();
-
-                    repaint();
-                }
-            }
-        }.execute();
+    public void resumeCombat() {
+        paused = false;
+        readyAt = System.currentTimeMillis();
     }
 
     private boolean canAct() {
         return battle != null
+                && !paused
                 && !battle.ended
                 && phase == 0
                 && battle.current() != null
@@ -298,6 +310,7 @@ public class Main extends JPanel {
                 }
 
             } else if (action == 1) {
+                changedSinceSave = true;
                 target = null;
                 message = battle.defend();
                 finishTurn();
@@ -364,6 +377,7 @@ public class Main extends JPanel {
 
         if (battle.canUse(pendingItem, hero)) {
             message = battle.useItem(pendingItem, hero);
+            changedSinceSave = true;
             deaths.remove(hero);
             finishTurn();
         } else {
@@ -483,6 +497,7 @@ public class Main extends JPanel {
     }
 
     private void startAttack(Battle.Fighter chosen) {
+        changedSinceSave = true;
         actor = battle.current();
         victim = chosen;
         target = chosen;
@@ -500,7 +515,7 @@ public class Main extends JPanel {
 
     // Advances movement, strike and return stages.
     private void update() {
-        if (battle == null || battle.ended) {
+        if (battle == null || battle.ended || paused) {
             return;
         }
 
@@ -578,6 +593,12 @@ public class Main extends JPanel {
 
         message += "\n" + battle.prompt();
         readyAt = System.currentTimeMillis();
+        if (checkpointAction != null) {
+            Runnable action = checkpointAction;
+            checkpointAction = null;
+            paused = true;
+            action.run();
+        }
     }
 
     private int sideIndex(Battle.Fighter f) {
@@ -1208,25 +1229,6 @@ public class Main extends JPanel {
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            Main view = new Main(new Game_API()::load);
-
-            JFrame window =
-                    new JFrame("Battle Preview");
-
-            window.setDefaultCloseOperation(
-                    JFrame.EXIT_ON_CLOSE
-            );
-
-            window.setContentPane(view);
-
-            window.setMinimumSize(
-                    new Dimension(1120, 700)
-            );
-
-            window.pack();
-            window.setLocationRelativeTo(null);
-            window.setVisible(true);
-        });
+        SwingUtilities.invokeLater(() -> new GameWindow().setVisible(true));
     }
 }

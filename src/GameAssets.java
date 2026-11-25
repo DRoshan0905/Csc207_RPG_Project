@@ -1,3 +1,5 @@
+import entity.Battle;
+
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.HashMap;

@@ -1,29 +1,131 @@
 # CSC207 RPG Project
 
-A turn-based RPG battle prototype built with Java Swing for CSC207. 
-Five heroes face three monsters, and turn order is determined by their speed stat.
+A Java Swing combat prototype with local save/continue and a persistent combat log.
+The current game is one encounter, with five heroes and three monsters from the
+Superpowers RPG Battle System pack. Players can attack, defend, heal, and revive
+party members; Run remains a placeholder.
 
-Players can select enemies to attack or defend to reduce incoming damage. 
-The interface includes animated characters, HP bars, and a turn-order display. 
-Items and Run are currently placeholders to be implemented, and character stats are temporary values.
+## Run and test
 
-## Running the Project
+Requires **JDK 17 or newer**. The Maven wrapper downloads Maven and dependencies on its
+first run; a separate Maven installation is not needed.
 
-Requires JDK 11 or newer. Open the project in IntelliJ IDEA and run `Main.java`.
+```sh
+./mvnw compile exec:java
+./mvnw test
+```
 
-An internet connection is needed to download assets initially. Downloaded assets are cached locally in `superpowers-cache/` for reuse. Each launch selects a random battle background, so an uncached background requires an internet connection.
+On Windows, use `mvnw.cmd` instead of `./mvnw`.
+In IntelliJ IDEA, import/open `pom.xml` as a Maven project, select a JDK of at least 17,
+reload Maven dependencies, and run `Main.main`.
+The existing `src/` layout is retained; tests live in `test/`.
 
-## Code Structure
+First-time art loading requires internet access. The existing `Game_API` downloads
+art from the GitHub-hosted Superpowers asset pack and caches it in `superpowers-cache/`,
+relative to the working directory. Each new game selects one of 24 backgrounds; an
+uncached background needs internet access. Continue reuses the saved background.
+Cached assets can be used offline. Saving and loading game state do not require an
+external API, account, or server. The course's external API
+requirement is separate: confirm with the TA whether the existing HTTP asset
+integration qualifies.
 
-- `Main.java`: User interface, input handling, rendering, and animation.
-- `Battle.java`: Fighters, turn order, attacks, defence, and battle outcomes.
-- `GameAssets.java`: Asset storage and animation helpers.
-- `Game_API.java`: Asset downloading, caching, GIF processing, and battle setup.
+## Save and continue
 
-## Asset and API Credits
+- **New Game** creates a new encounter without changing the previous saved game.
+- **Continue** restores the saved encounter, including the same monster art, HP,
+  stats, guarding, exact turn order, current turn, inventory quantities, background,
+  and combat history.
+- **View Saved Log** shows the saved history without downloading or loading artwork.
+- **Save** writes the current battle to the single save slot. A new game asks before
+  replacing an earlier save. Saving the continued battle updates its slot directly.
+- **Save & Exit** closes the window only after saving succeeds.
+- **Battle Log** opens a scrollable history of completed combat events and pauses
+  combat until the dialog is closed.
+- Closing a battle with unsaved changes offers Save & Exit, Exit Without Saving, or
+  Cancel. There is no automatic save; log entries persist when the battle is saved.
 
-Character and monster animations and battle backgrounds are downloaded from the RPG Battle System pack in [Sparklin Labs’ Superpowers Asset Packs](https://github.com/sparklinlabs/superpowers-asset-packs). Portraits are cropped from idle animation frames.
+If a save, log, or exit request arrives during an attack, the action finishes first.
+The checkpoint is taken **after damage and turn advancement**, before the next action.
+Combat stays paused while the save is written. Continue resumes at that checkpoint;
+animation frames and selected targets are reset. Future random enemy choices are made
+normally. Finished battles can also be saved and reopened with their outcome intact.
 
-Despite its name, `Game_API` downloads publicly accessible files through GitHub’s raw file service. It does not require an API key. No other external APIs are used in this version.
+The save file is UTF-8 JSON at:
 
-Artwork was created by Pixel-boy at Sparklin Labs and released under the Creative Commons Zero (CC0) licence, which permits use, modification, and redistribution. This project does not claim authorship of the original artwork.
+```text
+~/.rpg-project/save.json
+```
+
+Here `~` is Java's `user.home` directory. This location is independent of the project's
+working directory. Saves are local to this computer/user and are not committed to Git.
+The current save format is version 2. Version 1 saves from the FFBE prototype are
+not compatible with the new characters: Continue reports this clearly and leaves the
+file intact. Starting a new game does not overwrite it until you confirm a save.
+The version field allows future migrations. Artwork stays in the asset
+cache, not in the save. Loading validates the JSON structure, HP/stats, fighter IDs,
+turn references, battle status, and log ordering. Missing or invalid saves show a
+readable error and leave New Game available. Unsupported art IDs or party sizes are
+rejected before loading art. Invalid files are not deleted or automatically replaced.
+
+Writes go to a temporary file in the save directory, are flushed to disk, and then
+replace the save with an atomic move where the filesystem supports it. A regular
+replacement move is used where atomic moves are unsupported. Save errors keep the
+current battle open. This is one slot for one running game; simultaneous application
+instances and cloud synchronization are not supported.
+
+## Design
+
+The save/continue feature follows inward dependencies:
+
+```text
+GameWindow / Main (Swing)
+        -> interface_adapter.SaveLoadController
+        -> use_case.save_load (save/load interactors and repository port)
+        -> entity (Battle, GameState, CombatLogEntry)
+
+data_access.JsonGameSaveRepository -> repository port + GameState
+```
+
+- `Battle` owns combat rules and records successful attack/defend/item events and outcomes.
+  Its restore path bypasses the new-game shuffle and preserves fighter identity.
+- `GameState` is an immutable snapshot of fighter values, ordered rosters, turn order,
+  cursor, ended status, turn number, background ID, inventory, and history. It contains
+  no Swing or Gson types.
+- `SaveGameInteractor` captures a detached snapshot using an injectable clock, then
+  saves through `GameSaveRepository`. Capturing happens on Swing's event thread;
+  disk writes use the immutable snapshot on a worker thread.
+- `LoadGameInteractor` retrieves a validated snapshot through the same repository port.
+- `JsonGameSaveRepository` uses Gson and implements the filesystem details. It can be
+  replaced by another storage adapter without changing the combat model or use cases.
+- `GameWindow` wires dependencies, presents menus/status/errors, and performs file and
+  asset loading in `SwingWorker`s. `Main` retains combat rendering and animations and
+  exposes a checkpoint callback that pauses between completed actions.
+- `Game_API.load(Battle)` loads art for restored fighters and the saved background
+  rather than constructing another encounter.
+- `entity.Item` retains the item implementations and bag from the inventory feature.
+  Saved stacks include item type, name, healing amount, and remaining quantity;
+  restoration creates those stacks without replenishing starting items.
+
+The original prototype still places combat interaction and animation sequencing in
+`Main`; this feature does not claim to refactor the entire application into Clean
+Architecture. Future work could extract a combat use case/controller, add multiple
+save slots, or extend `GameState` with campaign progress and migrations.
+
+Tests cover snapshot isolation and restoration, guarding, dead fighters, exact turn
+order, victory/defeat, JSON round trips and validation, replacement and write failures,
+use-case storage failures, healing/revival through Swing, an actual Swing attack
+followed by a queued checkpoint, depleted inventory restoration, saved backgrounds,
+and offline loading of new and continued encounters.
+
+## Asset and API credits
+
+Character and monster animations and battle backgrounds are downloaded from the
+RPG Battle System pack in [Sparklin Labs’ Superpowers Asset Packs](https://github.com/sparklinlabs/superpowers-asset-packs).
+Portraits are cropped from idle animation frames.
+
+Despite its name, `Game_API` downloads publicly accessible files through GitHub’s raw
+file service. It does not require an API key. No other external APIs are used.
+
+Artwork was created by Pixel-boy at Sparklin Labs and released under the Creative
+Commons Zero (CC0) licence, which permits use, modification, and redistribution.
+This project does not claim authorship of the original artwork.
