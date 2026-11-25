@@ -16,6 +16,9 @@ import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import java.awt.Dimension;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 public class Main {
 
     public static void main(String[] args) {
@@ -48,11 +51,21 @@ public class Main {
                                 presenter
                         );
 
-                Combat.InputBoundary interactor =
-                        new Combat.Interactor(
-                                attack,
-                                defend
+                Combat.Action skill =
+                        new Combat.Skill(
+                                battle,
+                                presenter
                         );
+
+                Map<String, Combat.Action> actions =
+                        new LinkedHashMap<>();
+
+                actions.put("Attack", attack);
+                actions.put("Defend", defend);
+                actions.put("Skill", skill);
+
+                Combat.InputBoundary interactor =
+                        new Combat.Interactor();
 
                 Combat.Controller controller =
                         new Combat.Controller(
@@ -63,8 +76,10 @@ public class Main {
                         new BattleView(
                                 assets,
                                 controller,
-                                viewModel
+                                viewModel,
+                                actions
                         );
+
 
                 JFrame window =
                         new JFrame("RPG Battle");
