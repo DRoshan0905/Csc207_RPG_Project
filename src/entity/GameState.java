@@ -10,8 +10,9 @@ import java.util.stream.Stream;
 public record GameState(int formatVersion, String savedAt,
                         List<FighterState> players, List<FighterState> enemies,
                         List<String> turnOrder, int cursor, boolean ended,
-                        int turnNumber, List<CombatLogEntry> log) {
-    public static final int FORMAT_VERSION = 1;
+                        int turnNumber, List<CombatLogEntry> log,
+                        int backgroundId, List<ItemState> inventory) {
+    public static final int FORMAT_VERSION = 2;
 
     public GameState {
         if (formatVersion != FORMAT_VERSION) {
@@ -22,6 +23,16 @@ public record GameState(int formatVersion, String savedAt,
         enemies = List.copyOf(enemies);
         turnOrder = List.copyOf(turnOrder);
         log = List.copyOf(log);
+        inventory = List.copyOf(inventory);
+        if (backgroundId < 1 || backgroundId > 24) {
+            throw new IllegalArgumentException("Invalid saved background");
+        }
+        Set<String> stacks = new HashSet<>();
+        for (ItemState entry : inventory) {
+            if (!stacks.add(entry.type() + "\0" + entry.name() + "\0" + entry.amount())) {
+                throw new IllegalArgumentException("Duplicate saved inventory stack");
+            }
+        }
         if (players.isEmpty() || enemies.isEmpty() || turnNumber < 1) {
             throw new IllegalArgumentException("Missing fighters or invalid turn number");
         }
@@ -64,7 +75,7 @@ public record GameState(int formatVersion, String savedAt,
                                int speed, boolean guarding) {
         public FighterState {
             if (id == null || id.isBlank() || assetId == null
-                    || !assetId.matches("[0-9]{8,9}")
+                    || !assetId.matches("[A-Za-z][A-Za-z0-9_-]{0,63}")
                     || name == null || name.isBlank() || maxHp <= 0
                     || hp < 0 || hp > maxHp || attack < 0 || defense < 0 || speed < 0
                     || (hp == 0 && guarding)) {
@@ -84,6 +95,31 @@ public record GameState(int formatVersion, String savedAt,
             fighter.hp = hp;
             fighter.guarding = guarding;
             return fighter;
+        }
+    }
+
+    /** Stores values rather than Java class names or object identity. */
+    public record ItemState(String type, String name, int amount, int quantity) {
+        public ItemState {
+            if (name == null || name.isBlank() || quantity < 0
+                    || !("healing".equals(type) && amount > 0
+                    || "revive".equals(type) && amount == 0 && "Revive".equals(name))) {
+                throw new IllegalArgumentException("Invalid saved item");
+            }
+        }
+
+        public static ItemState from(Item item, int quantity) {
+            if (item instanceof Item.Healing healing) {
+                return new ItemState("healing", item.name(), healing.amount(), quantity);
+            }
+            if (item instanceof Item.Revive) {
+                return new ItemState("revive", item.name(), 0, quantity);
+            }
+            throw new IllegalArgumentException("Unsupported item type: " + item.name());
+        }
+
+        public Item restore() {
+            return "healing".equals(type) ? new Item.Healing(name, amount) : new Item.Revive();
         }
     }
 }

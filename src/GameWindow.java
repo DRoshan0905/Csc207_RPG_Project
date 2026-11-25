@@ -93,7 +93,7 @@ public final class GameWindow extends JFrame {
     private void loadBattle(boolean continuing) {
         setBusy(true, continuing ? "Loading saved battle and assets..." : "Loading characters and animations...");
         background(() -> {
-            FFBE_API api = new FFBE_API();
+            Game_API api = new Game_API();
             return continuing ? api.load(Battle.restore(controller.load())) : api.load();
         }, assets -> {
             view = new Main(assets);

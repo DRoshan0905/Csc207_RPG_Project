@@ -39,27 +39,39 @@ public class Battle {
 
     public final List<Fighter> players;
     public final List<Fighter> enemies;
+    public final Item.Bag bag = new Item.Bag();
 
     private final List<Fighter> order = new ArrayList<>();
     private int cursor;
     private int turnNumber = 1;
     private final List<CombatLogEntry> log = new ArrayList<>();
+    private final int backgroundId;
 
     public boolean ended;
 
     public Battle(List<Fighter> players, List<Fighter> enemies) {
-        this(players, enemies, true);
+        this(players, enemies, 1);
+    }
+
+    public Battle(List<Fighter> players, List<Fighter> enemies, int backgroundId) {
+        this(players, enemies, backgroundId, true);
         log.add(new CombatLogEntry(turnNumber, "An enemy group approaches!"));
     }
 
-    private Battle(List<Fighter> players, List<Fighter> enemies, boolean newGame) {
+    private Battle(List<Fighter> players, List<Fighter> enemies, int backgroundId, boolean newGame) {
+        if (backgroundId < 1 || backgroundId > 24) {
+            throw new IllegalArgumentException("Invalid background ID");
+        }
+        this.backgroundId = backgroundId;
         this.players = players;
         this.enemies = enemies;
 
         order.addAll(players);
         order.addAll(enemies);
-
         if (newGame) {
+            bag.add(new Item.Healing("Potion", 30), 3);
+            bag.add(new Item.Healing("Super Potion", 70), 1);
+            bag.add(new Item.Revive(), 1);
             Collections.shuffle(order);
             order.sort(Comparator.comparingInt(
                     (Fighter f) -> f.speed).reversed());
@@ -70,13 +82,17 @@ public class Battle {
         return List.copyOf(log);
     }
 
+    public int backgroundId() {
+        return backgroundId;
+    }
+
     /** Captures values, never references to mutable fighters or Swing state. */
     public GameState snapshot(String savedAt) {
         return new GameState(GameState.FORMAT_VERSION, savedAt,
                 players.stream().map(GameState.FighterState::from).toList(),
                 enemies.stream().map(GameState.FighterState::from).toList(),
                 order.stream().map(f -> f.id).toList(), cursor, ended,
-                turnNumber, log);
+                turnNumber, log, backgroundId, bag.snapshot());
     }
 
     public static Battle restore(GameState state) {
@@ -84,7 +100,8 @@ public class Battle {
                 .map(GameState.FighterState::restore).toList();
         List<Fighter> enemies = state.enemies().stream()
                 .map(GameState.FighterState::restore).toList();
-        Battle battle = new Battle(players, enemies, false);
+        Battle battle = new Battle(players, enemies, state.backgroundId(), false);
+        state.inventory().forEach(entry -> battle.bag.add(entry.restore(), entry.quantity()));
         Map<String, Fighter> fighters = new HashMap<>();
         battle.order.forEach(f -> fighters.put(f.id, f));
         battle.order.clear();
@@ -170,6 +187,26 @@ public class Battle {
         return result;
     }
 
+    public boolean canUse(Item item, Fighter target) {
+        return !ended && item != null && target != null
+                && current() != null && current().player
+                && (players.contains(target) || enemies.contains(target))
+                && bag.count(item) > 0
+                && target.player == item.targetsAllies()
+                && item.canUse(target);
+    }
+
+    public String useItem(Item item, Fighter target) {
+        if (!canUse(item, target)) {
+            throw new IllegalStateException("Can't use " + (item == null ? "item" : item.name()));
+        }
+
+        bag.consume(item);
+        String result = item.use(current(), target);
+        log.add(new CombatLogEntry(turnNumber, result));
+        return result;
+    }
+
     public void next() {
         if (ended) {
             return;
@@ -196,6 +233,6 @@ public class Battle {
         Fighter f = current();
 
         return f.name + "'s turn."
-                + (f.player ? " Choose Attack or Defend." : "");
+                + (f.player ? " Choose Attack, Defend or Items." : "");
     }
 }

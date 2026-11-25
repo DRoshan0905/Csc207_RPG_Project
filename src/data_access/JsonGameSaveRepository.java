@@ -68,6 +68,13 @@ public final class JsonGameSaveRepository implements GameSaveRepository {
         }
         try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             JsonObject json = gson.fromJson(reader, JsonObject.class);
+            require(json != null, "Missing save object");
+            numbers(json, "formatVersion");
+            if (json.get("formatVersion").getAsInt() != GameState.FORMAT_VERSION) {
+                throw new IOException("This save uses an older or unsupported game format. "
+                        + "Saves from the FFBE prototype cannot be continued with the new characters. "
+                        + "The file has been kept; start a new game to use the updated version.");
+            }
             checkRequiredFields(json);
             // Record constructors enforce battle invariants after JSON shape validation.
             return gson.fromJson(json, GameState.class);
@@ -80,7 +87,7 @@ public final class JsonGameSaveRepository implements GameSaveRepository {
     /** Missing booleans/numbers must not silently become false/zero during decoding. */
     private void checkRequiredFields(JsonObject json) {
         require(json != null, "Missing save object");
-        numbers(json, "formatVersion", "cursor", "turnNumber");
+        numbers(json, "formatVersion", "cursor", "turnNumber", "backgroundId");
         strings(json, "savedAt");
         booleans(json, "ended");
         for (String side : new String[]{"players", "enemies"}) {
@@ -99,6 +106,11 @@ public final class JsonGameSaveRepository implements GameSaveRepository {
             JsonObject entry = element.getAsJsonObject();
             numbers(entry, "turn");
             strings(entry, "message");
+        }
+        for (JsonElement element : array(json, "inventory")) {
+            JsonObject entry = element.getAsJsonObject();
+            strings(entry, "type", "name");
+            numbers(entry, "amount", "quantity");
         }
     }
 

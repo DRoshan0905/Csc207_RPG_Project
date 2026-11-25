@@ -21,7 +21,7 @@ class MainCheckpointTest {
                 panel.set(view);
                 view.setSize(1080, 640);
                 click(view, 130, 410); // Select the enemy.
-                click(view, 900, 60); // Start Rain's attack.
+                click(view, 900, 60); // Start Warrior's attack.
                 view.atCheckpoint(() -> {
                     saved.set(view.battle().snapshot(BattleFixtures.SAVED_AT));
                     checkpointReached.countDown();
@@ -32,7 +32,7 @@ class MainCheckpointTest {
             GameState state = saved.get();
             assertNotNull(state);
             assertEquals(67, state.enemies().get(0).hp());
-            assertEquals("fina", state.turnOrder().get(state.cursor()));
+            assertEquals("mage", state.turnOrder().get(state.cursor()));
             assertEquals(2, state.log().size(), "Attack must be logged exactly once");
             SwingUtilities.invokeAndWait(() -> {
                 assertEquals(state, panel.get().battle().snapshot(BattleFixtures.SAVED_AT));
@@ -41,7 +41,7 @@ class MainCheckpointTest {
                     continued.atCheckpoint(() -> assertEquals(state,
                             continued.battle().snapshot(BattleFixtures.SAVED_AT)));
                     // A selected target is presentation state, so Continue starts at the turn prompt.
-                    assertEquals("Fina's turn. Choose Attack or Defend.", continued.battle().prompt());
+                    assertEquals("Mage's turn. Choose Attack, Defend or Items.", continued.battle().prompt());
                 } finally {
                     continued.removeNotify();
                 }
@@ -65,8 +65,54 @@ class MainCheckpointTest {
                 assertEquals(before, view.battle().snapshot(BattleFixtures.SAVED_AT));
                 view.resumeCombat();
                 click(view, 900, 100);
-                assertEquals("fina", view.battle().current().id);
+                assertEquals("mage", view.battle().current().id);
                 assertTrue(view.battle().players.get(0).guarding);
+            } finally {
+                view.removeNotify();
+            }
+        });
+    }
+
+    @Test
+    void usingAnItemThroughTheUiMarksProgressUnsavedAndLogsTheEvent() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            Battle battle = BattleFixtures.battle();
+            battle.players.get(0).hp = 80;
+            Main view = new Main(assets(battle));
+            try {
+                view.setSize(1080, 640);
+                view.markSaved();
+                click(view, 900, 134); // Items.
+                click(view, 900, 60); // Potion.
+                click(view, 450, 550); // Warrior's card.
+                assertEquals(110, battle.players.get(0).hp);
+                assertTrue(view.hasUnsavedChanges());
+                assertEquals("mage", battle.current().id);
+                assertEquals("Warrior uses Potion on Warrior (+30 HP).", battle.log().get(1).message());
+                view.atCheckpoint(() -> assertEquals(2,
+                        battle.snapshot(BattleFixtures.SAVED_AT).inventory().get(0).quantity()));
+            } finally {
+                view.removeNotify();
+            }
+        });
+    }
+
+    @Test
+    void reviveThroughTheUiRestoresATargetAndConsumesTheSavedReviveStack() throws Exception {
+        SwingUtilities.invokeAndWait(() -> {
+            Battle battle = BattleFixtures.battle();
+            battle.players.get(1).hp = 0;
+            Main view = new Main(assets(battle));
+            try {
+                view.setSize(1080, 640);
+                view.markSaved();
+                click(view, 900, 134); // Items.
+                click(view, 900, 134); // Revive (third slot).
+                click(view, 800, 550); // Mage's card.
+                assertEquals(62, battle.players.get(1).hp);
+                assertTrue(view.hasUnsavedChanges());
+                assertEquals("mage", battle.current().id);
+                assertEquals(0, battle.snapshot(BattleFixtures.SAVED_AT).inventory().get(2).quantity());
             } finally {
                 view.removeNotify();
             }

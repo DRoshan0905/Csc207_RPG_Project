@@ -30,7 +30,7 @@ class JsonGameSaveRepositoryTest {
         repository.save(expected);
         assertTrue(repository.exists());
         assertEquals(expected, repository.load());
-        assertTrue(Files.readString(file).contains("\n  \"formatVersion\": 1"));
+        assertTrue(Files.readString(file).contains("\n  \"formatVersion\": 2"));
         try (var files = Files.list(file.getParent())) {
             assertEquals(1, files.count(), "Temporary files must be cleaned up");
         }
@@ -82,7 +82,7 @@ class JsonGameSaveRepositoryTest {
             case "duplicateId" -> hero.addProperty("id", "monster");
             case "wrongSide" -> hero.addProperty("player", false);
             case "unknownTurnId" -> json.getAsJsonArray("turnOrder").set(0, new Gson().toJsonTree("unknown"));
-            case "duplicateTurnId" -> json.getAsJsonArray("turnOrder").set(0, new Gson().toJsonTree("fina"));
+            case "duplicateTurnId" -> json.getAsJsonArray("turnOrder").set(0, new Gson().toJsonTree("mage"));
             case "cursor" -> json.addProperty("cursor", -1);
             case "ended" -> json.addProperty("ended", true);
             case "emptyParty" -> json.getAsJsonArray("players").remove(0);
@@ -98,6 +98,39 @@ class JsonGameSaveRepositoryTest {
         String contents = json.toString();
         Files.writeString(file, contents);
         assertThrows(IOException.class, new JsonGameSaveRepository(file)::load);
+        assertEquals(contents, Files.readString(file));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"missingInventory", "missingBackground", "backgroundRange", "negativeQuantity",
+            "unknownType", "missingQuantity", "invalidAmount", "duplicateStack", "fractionalQuantity"})
+    void invalidInventoryAndBackgroundDataIsRejected(String corruption) throws Exception {
+        JsonObject json = new Gson().toJsonTree(BattleFixtures.state()).getAsJsonObject();
+        JsonObject stack = json.getAsJsonArray("inventory").get(0).getAsJsonObject();
+        switch (corruption) {
+            case "missingInventory" -> json.remove("inventory");
+            case "missingBackground" -> json.remove("backgroundId");
+            case "backgroundRange" -> json.addProperty("backgroundId", 25);
+            case "negativeQuantity" -> stack.addProperty("quantity", -1);
+            case "unknownType" -> stack.addProperty("type", "unknown");
+            case "missingQuantity" -> stack.remove("quantity");
+            case "invalidAmount" -> stack.addProperty("amount", 0);
+            case "duplicateStack" -> json.getAsJsonArray("inventory").add(stack.deepCopy());
+            case "fractionalQuantity" -> stack.addProperty("quantity", 1.5);
+            default -> fail("Unknown corruption");
+        }
+        Path file = temporary.resolve("save.json");
+        Files.writeString(file, json.toString());
+        assertThrows(IOException.class, new JsonGameSaveRepository(file)::load);
+    }
+
+    @Test
+    void legacyFfbeSavesReportIncompatibilityAndAreKeptIntact() throws Exception {
+        Path file = temporary.resolve("save.json");
+        String contents = "{\"formatVersion\":1,\"savedAt\":\"2026-11-22T15:00:00Z\"}";
+        Files.writeString(file, contents);
+        IOException error = assertThrows(IOException.class, new JsonGameSaveRepository(file)::load);
+        assertTrue(error.getMessage().contains("FFBE prototype"));
         assertEquals(contents, Files.readString(file));
     }
 

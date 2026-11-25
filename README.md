@@ -1,7 +1,9 @@
-# RPG Battle
+# CSC207 RPG Project
 
 A Java Swing combat prototype with local save/continue and a persistent combat log.
-The current game is one encounter, with five heroes and three randomly selected monsters.
+The current game is one encounter, with five heroes and three monsters from the
+Superpowers RPG Battle System pack. Players can attack, defend, heal, and revive
+party members; Run remains a placeholder.
 
 ## Run and test
 
@@ -18,10 +20,12 @@ In IntelliJ IDEA, import/open `pom.xml` as a Maven project, select a JDK of at l
 reload Maven dependencies, and run `Main.main`.
 The existing `src/` layout is retained; tests live in `test/`.
 
-First-time art loading requires internet access. The existing `FFBE_API` downloads
-art from a GitHub-hosted FFBE asset collection and caches it in `ffbe-cache/`, relative
-to the working directory. Cached assets can be used offline. Saving and loading game
-state do not require an external API, account, or server. The course's external API
+First-time art loading requires internet access. The existing `Game_API` downloads
+art from the GitHub-hosted Superpowers asset pack and caches it in `superpowers-cache/`,
+relative to the working directory. Each new game selects one of 24 backgrounds; an
+uncached background needs internet access. Continue reuses the saved background.
+Cached assets can be used offline. Saving and loading game state do not require an
+external API, account, or server. The course's external API
 requirement is separate: confirm with the TA whether the existing HTTP asset
 integration qualifies.
 
@@ -29,7 +33,8 @@ integration qualifies.
 
 - **New Game** creates a new encounter without changing the previous saved game.
 - **Continue** restores the saved encounter, including the same monster art, HP,
-  stats, guarding, exact turn order, current turn, and combat history.
+  stats, guarding, exact turn order, current turn, inventory quantities, background,
+  and combat history.
 - **View Saved Log** shows the saved history without downloading or loading artwork.
 - **Save** writes the current battle to the single save slot. A new game asks before
   replacing an earlier save. Saving the continued battle updates its slot directly.
@@ -53,7 +58,10 @@ The save file is UTF-8 JSON at:
 
 Here `~` is Java's `user.home` directory. This location is independent of the project's
 working directory. Saves are local to this computer/user and are not committed to Git.
-The format has a version field to allow future migrations. Artwork stays in the asset
+The current save format is version 2. Version 1 saves from the FFBE prototype are
+not compatible with the new characters: Continue reports this clearly and leaves the
+file intact. Starting a new game does not overwrite it until you confirm a save.
+The version field allows future migrations. Artwork stays in the asset
 cache, not in the save. Loading validates the JSON structure, HP/stats, fighter IDs,
 turn references, battle status, and log ordering. Missing or invalid saves show a
 readable error and leave New Game available. Unsupported art IDs or party sizes are
@@ -78,10 +86,11 @@ GameWindow / Main (Swing)
 data_access.JsonGameSaveRepository -> repository port + GameState
 ```
 
-- `Battle` owns combat rules and records successful attack/defend events and outcomes.
+- `Battle` owns combat rules and records successful attack/defend/item events and outcomes.
   Its restore path bypasses the new-game shuffle and preserves fighter identity.
 - `GameState` is an immutable snapshot of fighter values, ordered rosters, turn order,
-  cursor, ended status, turn number, and history. It contains no Swing or Gson types.
+  cursor, ended status, turn number, background ID, inventory, and history. It contains
+  no Swing or Gson types.
 - `SaveGameInteractor` captures a detached snapshot using an injectable clock, then
   saves through `GameSaveRepository`. Capturing happens on Swing's event thread;
   disk writes use the immutable snapshot on a worker thread.
@@ -91,8 +100,11 @@ data_access.JsonGameSaveRepository -> repository port + GameState
 - `GameWindow` wires dependencies, presents menus/status/errors, and performs file and
   asset loading in `SwingWorker`s. `Main` retains combat rendering and animations and
   exposes a checkpoint callback that pauses between completed actions.
-- `FFBE_API.load(Battle)` loads art for restored fighters rather than constructing a
-  new random encounter.
+- `Game_API.load(Battle)` loads art for restored fighters and the saved background
+  rather than constructing another encounter.
+- `entity.Item` retains the item implementations and bag from the inventory feature.
+  Saved stacks include item type, name, healing amount, and remaining quantity;
+  restoration creates those stacks without replenishing starting items.
 
 The original prototype still places combat interaction and animation sequencing in
 `Main`; this feature does not claim to refactor the entire application into Clean
@@ -101,4 +113,19 @@ save slots, or extend `GameState` with campaign progress and migrations.
 
 Tests cover snapshot isolation and restoration, guarding, dead fighters, exact turn
 order, victory/defeat, JSON round trips and validation, replacement and write failures,
-use-case storage failures, and an actual Swing attack followed by a queued checkpoint.
+use-case storage failures, healing/revival through Swing, an actual Swing attack
+followed by a queued checkpoint, depleted inventory restoration, saved backgrounds,
+and offline loading of new and continued encounters.
+
+## Asset and API credits
+
+Character and monster animations and battle backgrounds are downloaded from the
+RPG Battle System pack in [Sparklin Labs’ Superpowers Asset Packs](https://github.com/sparklinlabs/superpowers-asset-packs).
+Portraits are cropped from idle animation frames.
+
+Despite its name, `Game_API` downloads publicly accessible files through GitHub’s raw
+file service. It does not require an API key. No other external APIs are used.
+
+Artwork was created by Pixel-boy at Sparklin Labs and released under the Creative
+Commons Zero (CC0) licence, which permits use, modification, and redistribution.
+This project does not claim authorship of the original artwork.

@@ -14,10 +14,10 @@ class BattleStateTest {
         Battle restored = Battle.restore(state);
 
         assertEquals(state, restored.snapshot(BattleFixtures.SAVED_AT));
-        assertEquals("fina", restored.current().id);
-        assertEquals("10000003", restored.enemies.get(0).assetId);
+        assertEquals("mage", restored.current().id);
+        assertEquals("slime", restored.enemies.get(0).assetId);
         assertNotSame(battle.players.get(0), restored.players.get(0));
-        assertEquals(List.of("rain", "fina", "monster"), state.turnOrder());
+        assertEquals(List.of("warrior", "mage", "monster"), state.turnOrder());
     }
 
     @Test
@@ -58,7 +58,7 @@ class BattleStateTest {
         Battle restored = Battle.restore(battle.snapshot(BattleFixtures.SAVED_AT));
         assertEquals(0, restored.players.get(1).hp);
         assertEquals("monster", restored.current().id);
-        assertTrue(restored.preview(8).stream().noneMatch(f -> f.id.equals("fina")));
+        assertTrue(restored.preview(8).stream().noneMatch(f -> f.id.equals("mage")));
     }
 
     @Test
@@ -91,8 +91,8 @@ class BattleStateTest {
     @Test
     void savedTurnOrderIsRestoredVerbatimRatherThanSortedAgain() {
         GameState original = BattleFixtures.state();
-        GameState ordered = new GameState(1, original.savedAt(), original.players(), original.enemies(),
-                List.of("monster", "fina", "rain"), 1, false, 1, original.log());
+        GameState ordered = new GameState(GameState.FORMAT_VERSION, original.savedAt(), original.players(), original.enemies(),
+                List.of("monster", "mage", "warrior"), 1, false, 1, original.log(), original.backgroundId(), original.inventory());
         assertEquals(ordered, Battle.restore(ordered).snapshot(BattleFixtures.SAVED_AT));
     }
 }

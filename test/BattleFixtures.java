@@ -7,9 +7,9 @@ final class BattleFixtures {
 
     static Battle battle() {
         return new Battle(List.of(
-                new Battle.Fighter("rain", "100000102", "Rain", true, 160, 34, 24, 100),
-                new Battle.Fighter("fina", "100000302", "Fina", true, 125, 27, 18, 90)),
-                List.of(new Battle.Fighter("monster", "10000003", "Monster 1", false,
+                new Battle.Fighter("warrior", "warrior", "Warrior", true, 160, 34, 24, 100),
+                new Battle.Fighter("mage", "mage", "Mage", true, 125, 27, 18, 90)),
+                List.of(new Battle.Fighter("monster", "slime", "Slime", false,
                         105, 25, 18, 55)));
     }
 
