@@ -36,3 +36,8 @@ build/
 
 ### Mac OS ###
 .DS_Storesuperpowers-cache/
+
+### Local build output, IDE settings, and old caches ###
+.idea/
+out/
+ffbe-cache/
