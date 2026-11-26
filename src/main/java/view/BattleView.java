@@ -3,6 +3,7 @@ package view;
 import data_access.GameAssets;
 import entity.Battle;
 import entity.Fighter;
+import entity.Stat;
 import interface_adapter.items.ItemsViewModel;
 import use_case.Combat;
 
@@ -229,10 +230,18 @@ public class BattleView extends JPanel {
             public void mouseReleased(MouseEvent e) {
                 pressed = -1;
             }
+
+            @Override
+            public void mouseWheelMoved(MouseWheelEvent e) {
+                if (itemMenu.isOpen()) {
+                    itemMenu.scroll(e.getWheelRotation());
+                }
+            }
         };
 
         addMouseListener(input);
         addMouseMotionListener(input);
+        addMouseWheelListener(input);
     }
 
     private boolean canAct() {
@@ -280,7 +289,9 @@ public class BattleView extends JPanel {
                 || (itemMenu.isOpen()
                 && itemMenu.contains(mouse, dialogueBox()))
                 || (itemMenu.hasSelection()
-                && heroAt(mouse) != null));
+                && (itemMenu.targetsEnemies()
+                ? enemyAt(mouse)
+                : heroAt(mouse)) != null));
 
         setCursor(
                 Cursor.getPredefinedCursor(
@@ -384,6 +395,16 @@ public class BattleView extends JPanel {
             return;
         }
 
+        if (itemMenu.targetsEnemies()) {
+            Fighter enemy = enemyAt(point);
+
+            if (enemy != null) {
+                itemMenu.useOn(battle.enemies.indexOf(enemy));
+            }
+
+            return;
+        }
+
         Fighter hero = heroAt(point);
 
         if (hero != null) {
@@ -391,8 +412,9 @@ public class BattleView extends JPanel {
         }
     }
 
-    private void itemUsed(int heroIndex) {
-        deaths.remove(battle.players.get(heroIndex));
+    private void itemUsed(int targetIndex) {
+        // A revived hero should be drawn again.
+        deaths.keySet().removeIf(Fighter::alive);
         viewModel.setMessage(itemsViewModel.getMessage());
         finishTurn();
     }
@@ -1236,6 +1258,8 @@ public class BattleView extends JPanel {
                         || choosing
                         || fighter
                         == enemyAt(mouse)
+                        || itemMenu.canUseOnEnemy(
+                        battle.enemies.indexOf(fighter))
         )) {
 
             g.setColor(ACCENT);
@@ -1312,9 +1336,49 @@ public class BattleView extends JPanel {
                     5,
                     fighter
             );
+
+            drawDebuffs(g, fighter, point);
         }
 
         g.dispose();
+    }
+
+    // Shows "ATK\u2193 DEF\u2193" under a monster that items have weakened.
+    private void drawDebuffs(
+            Graphics2D g,
+            Fighter fighter,
+            Point point) {
+
+        StringBuilder label = new StringBuilder();
+
+        for (Stat stat : Stat.values()) {
+            if (fighter.isWeakened(stat)) {
+                if (label.length() > 0) {
+                    label.append(' ');
+                }
+
+                label.append(stat.label()).append('\u2193');
+            }
+        }
+
+        if (label.length() == 0) {
+            return;
+        }
+
+        int width =
+                g.getFontMetrics(
+                                new Font("Dialog", Font.BOLD, 11)
+                        )
+                        .stringWidth(label.toString());
+
+        text(
+                g,
+                label.toString(),
+                point.x - width / 2,
+                point.y + 52,
+                11,
+                new Color(196, 140, 255)
+        );
     }
 
     // ---------- TURN TRACKER ----------
@@ -1436,7 +1500,7 @@ public class BattleView extends JPanel {
                 (!battle.ended
                         && fighter
                         == battle.current())
-                        || itemMenu.canUseOn(index)
+                        || itemMenu.canUseOnHero(index)
 
                         ? ACCENT
                         : new Color(
@@ -1519,9 +1583,9 @@ public class BattleView extends JPanel {
         text(
                 g,
                 "ATK "
-                        + fighter.attack
+                        + fighter.getAttack()
                         + "  DEF "
-                        + fighter.defense,
+                        + fighter.getDefense(),
 
                 rectangle.x + 9,
                 rectangle.y + 100,

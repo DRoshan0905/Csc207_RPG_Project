@@ -25,7 +25,9 @@ public class HealingItem implements Item {
     }
 
     @Override
-    public void use(ItemTarget target) {
+    public String use(ItemTarget target) {
+        int before = target.getHp();
         target.restoreHp(amount);
+        return "+" + (target.getHp() - before) + " HP";
     }
 }

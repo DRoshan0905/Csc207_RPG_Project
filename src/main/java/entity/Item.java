@@ -5,7 +5,13 @@ public interface Item {
 
     String getDescription();
 
+    /** Heroes by default; debuff items override this to target monsters. */
+    default TargetSide getTargetSide() {
+        return TargetSide.ALLY;
+    }
+
     boolean canUse(ItemTarget target);
 
-    void use(ItemTarget target);
+    /** Applies the item and returns a short summary such as "+30 HP". */
+    String use(ItemTarget target);
 }

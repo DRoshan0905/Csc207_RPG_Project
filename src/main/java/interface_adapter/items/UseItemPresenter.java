@@ -15,9 +15,9 @@ public class UseItemPresenter implements UseItemOutputBoundary {
         viewModel.setMessage(outputData.getUserName()
                 + " uses " + outputData.getItemName()
                 + " on " + outputData.getTargetName()
-                + " (+" + outputData.getHpRestored() + " HP).");
+                + " (" + outputData.getEffect() + ").");
 
-        viewModel.fireItemUsed(outputData.getHeroIndex());
+        viewModel.fireItemUsed(outputData.getTargetIndex());
     }
 
     @Override

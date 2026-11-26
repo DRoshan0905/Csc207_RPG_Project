@@ -23,7 +23,9 @@ public class ReviveItem implements Item {
     }
 
     @Override
-    public void use(ItemTarget target) {
+    public String use(ItemTarget target) {
+        int before = target.getHp();
         target.restoreHp(target.getMaxHp() / 2);
+        return "+" + (target.getHp() - before) + " HP";
     }
 }

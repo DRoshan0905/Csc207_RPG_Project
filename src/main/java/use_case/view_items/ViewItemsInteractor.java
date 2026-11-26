@@ -3,6 +3,7 @@ package use_case.view_items;
 import entity.Inventory;
 import entity.Item;
 import entity.ItemTarget;
+import entity.TargetSide;
 import use_case.ItemDataAccessInterface;
 
 import java.util.ArrayList;
@@ -23,21 +24,24 @@ public class ViewItemsInteractor implements ViewItemsInputBoundary {
     @Override
     public void execute() {
         Inventory inventory = dataAccess.getInventory();
-        List<? extends ItemTarget> heroes = dataAccess.getHeroes();
         List<ViewItemsOutputData.Entry> entries = new ArrayList<>();
 
         for (Item item : inventory.available()) {
+            List<? extends ItemTarget> side =
+                    dataAccess.getSide(item.getTargetSide());
             Set<Integer> usable = new HashSet<>();
 
-            for (int i = 0; i < heroes.size(); i++) {
-                if (item.canUse(heroes.get(i))) {
+            for (int i = 0; i < side.size(); i++) {
+                if (item.canUse(side.get(i))) {
                     usable.add(i);
                 }
             }
 
             entries.add(new ViewItemsOutputData.Entry(
                     item.getName(), item.getDescription(),
-                    inventory.count(item), usable));
+                    inventory.count(item),
+                    item.getTargetSide() == TargetSide.ENEMY,
+                    usable));
         }
 
         presenter.present(new ViewItemsOutputData(entries));

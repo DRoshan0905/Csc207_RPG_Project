@@ -4,6 +4,8 @@ import entity.HealingItem;
 import entity.Inventory;
 import entity.Item;
 import entity.ReviveItem;
+import entity.Stat;
+import entity.WeakenItem;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -12,6 +14,8 @@ import java.util.Map;
 public class ItemCatalog {
     private static final String POTIONS =
             "medieval-fantasy/items/food-&-potion/potion.png";
+    private static final String ELEMENTS =
+            "medieval-fantasy/items/element/elements.png";
 
     private final Inventory inventory = new Inventory();
     private final Map<String, String> iconPaths = new LinkedHashMap<>();
@@ -22,6 +26,10 @@ public class ItemCatalog {
         register(new HealingItem("Super Potion", 70), 1, POTIONS + "#3");
         register(new ReviveItem("Revive"), 1,
                 "medieval-fantasy/hud/full-heart.png");
+        register(new WeakenItem("Hex Orb", Stat.ATTACK, 25), 2,
+                ELEMENTS + "#7");
+        register(new WeakenItem("Rust Powder", Stat.DEFENSE, 30), 2,
+                ELEMENTS + "#3");
     }
 
     private void register(Item item, int quantity, String iconPath) {

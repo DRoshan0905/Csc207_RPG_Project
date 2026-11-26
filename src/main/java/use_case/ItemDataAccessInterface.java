@@ -2,6 +2,7 @@ package use_case;
 
 import entity.Inventory;
 import entity.ItemTarget;
+import entity.TargetSide;
 
 import java.util.List;
 
@@ -10,6 +11,13 @@ public interface ItemDataAccessInterface {
     Inventory getInventory();
 
     List<? extends ItemTarget> getHeroes();
+
+    List<? extends ItemTarget> getEnemies();
+
+    /** The heroes or the enemies, depending on the side. */
+    default List<? extends ItemTarget> getSide(TargetSide side) {
+        return side == TargetSide.ENEMY ? getEnemies() : getHeroes();
+    }
 
     String getCurrentFighterName();
 

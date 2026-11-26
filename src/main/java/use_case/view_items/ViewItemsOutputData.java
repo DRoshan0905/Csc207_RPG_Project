@@ -18,14 +18,16 @@ public class ViewItemsOutputData {
         private final String name;
         private final String description;
         private final int count;
-        private final Set<Integer> usableHeroes;
+        private final boolean enemyTarget;
+        private final Set<Integer> usableTargets;
 
         public Entry(String name, String description, int count,
-                     Set<Integer> usableHeroes) {
+                     boolean enemyTarget, Set<Integer> usableTargets) {
             this.name = name;
             this.description = description;
             this.count = count;
-            this.usableHeroes = Set.copyOf(usableHeroes);
+            this.enemyTarget = enemyTarget;
+            this.usableTargets = Set.copyOf(usableTargets);
         }
 
         public String getName() {
@@ -40,9 +42,14 @@ public class ViewItemsOutputData {
             return count;
         }
 
-        /** Positions of the heroes this item would work on. */
-        public Set<Integer> getUsableHeroes() {
-            return usableHeroes;
+        /** True if this item is used on enemies instead of heroes. */
+        public boolean isEnemyTarget() {
+            return enemyTarget;
+        }
+
+        /** Positions on the target side this item would work on. */
+        public Set<Integer> getUsableTargets() {
+            return usableTargets;
         }
     }
 }
