@@ -26,6 +26,9 @@ public class ItemMenuView {
     private boolean open;
     private ItemRow selected;
 
+    // Index of the first visible row when there are more than MAX_ROWS.
+    private int scroll;
+
     public ItemMenuView(ItemsViewModel viewModel,
                         ViewItemsController viewItems,
                         UseItemController useItem,
@@ -43,7 +46,14 @@ public class ItemMenuView {
     public void open() {
         open = true;
         selected = null;
+        scroll = 0;
         viewItems.execute();
+    }
+
+    /** Scrolls the list by whole rows; positive moves down. */
+    public void scroll(int rows) {
+        int last = Math.max(0, viewModel.getRows().size() - MAX_ROWS);
+        scroll = Math.max(0, Math.min(last, scroll + rows));
     }
 
     public void close() {
@@ -55,13 +65,27 @@ public class ItemMenuView {
         return selected != null;
     }
 
-    public boolean canUseOn(int heroIndex) {
-        return selected != null && selected.canUseOn(heroIndex);
+    /** True if the selected item is used on enemies. */
+    public boolean targetsEnemies() {
+        return selected != null && selected.targetsEnemies();
     }
 
-    public void useOn(int heroIndex) {
+    public boolean canUseOnHero(int heroIndex) {
+        return selected != null
+                && !selected.targetsEnemies()
+                && selected.canUseOn(heroIndex);
+    }
+
+    public boolean canUseOnEnemy(int enemyIndex) {
+        return selected != null
+                && selected.targetsEnemies()
+                && selected.canUseOn(enemyIndex);
+    }
+
+    /** Uses the selected item on this position of its target side. */
+    public void useOn(int targetIndex) {
         if (selected != null) {
-            useItem.execute(selected.getName(), heroIndex);
+            useItem.execute(selected.getName(), targetIndex);
         }
     }
 
@@ -79,7 +103,8 @@ public class ItemMenuView {
 
         selected = row;
         viewModel.setMessage(
-                "Click a hero to use " + row.getName() + ".");
+                (row.targetsEnemies() ? "Click an enemy" : "Click a hero")
+                        + " to use " + row.getName() + ".");
 
         return true;
     }
@@ -92,9 +117,11 @@ public class ItemMenuView {
                 box.x + 12, box.y + 20, 13, ACCENT);
 
         for (int i = 0; i < visibleRows(); i++) {
-            drawRow(g, viewModel.getRows().get(i),
+            drawRow(g, viewModel.getRows().get(scroll + i),
                     rowBox(box, i), mouse);
         }
+
+        drawScrollHint(g, box);
 
         g.dispose();
     }
@@ -110,8 +137,10 @@ public class ItemMenuView {
         BufferedImage icon = icons.get(row.getName());
 
         if (icon != null) {
-            int w = icon.getWidth() * 2;
-            int h = icon.getHeight() * 2;
+            // Double small pixel art, but keep larger icons inside the row.
+            double scale = Math.min(2.0, 24.0 / icon.getHeight());
+            int w = (int) (icon.getWidth() * scale);
+            int h = (int) (icon.getHeight() * scale);
 
             g.drawImage(icon, r.x + 18 - w / 2,
                     r.y + (r.height - h) / 2, w, h, null);
@@ -124,12 +153,28 @@ public class ItemMenuView {
                 r.x + r.width - 32, r.y + 20, 14, ACCENT);
     }
 
+    // Arrows in the top-right corner when rows are hidden above or below.
+    private void drawScrollHint(Graphics2D g, Rectangle box) {
+        boolean above = scroll > 0;
+        boolean below =
+                scroll + MAX_ROWS < viewModel.getRows().size();
+
+        if (!above && !below) {
+            return;
+        }
+
+        String hint = (above ? "\u25B2" : " ")
+                + (below ? "\u25BC" : " ") + " scroll";
+
+        text(g, hint, box.x + box.width - 78, box.y + 20, 11, MUTED);
+    }
+
     private ItemRow rowAt(Point point, Rectangle box) {
         List<ItemRow> rows = viewModel.getRows();
 
         for (int i = 0; i < visibleRows(); i++) {
             if (rowBox(box, i).contains(point)) {
-                return rows.get(i);
+                return rows.get(scroll + i);
             }
         }
 
@@ -137,7 +182,7 @@ public class ItemMenuView {
     }
 
     private int visibleRows() {
-        return Math.min(MAX_ROWS, viewModel.getRows().size());
+        return Math.min(MAX_ROWS, viewModel.getRows().size() - scroll);
     }
 
     private Rectangle rowBox(Rectangle box, int i) {

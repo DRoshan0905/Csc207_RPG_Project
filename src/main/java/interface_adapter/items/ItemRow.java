@@ -7,14 +7,16 @@ public class ItemRow {
     private final String name;
     private final String description;
     private final String count;
-    private final Set<Integer> usableHeroes;
+    private final boolean enemyTarget;
+    private final Set<Integer> usableTargets;
 
     public ItemRow(String name, String description, String count,
-                   Set<Integer> usableHeroes) {
+                   boolean enemyTarget, Set<Integer> usableTargets) {
         this.name = name;
         this.description = description;
         this.count = count;
-        this.usableHeroes = usableHeroes;
+        this.enemyTarget = enemyTarget;
+        this.usableTargets = usableTargets;
     }
 
     public String getName() {
@@ -29,7 +31,13 @@ public class ItemRow {
         return count;
     }
 
-    public boolean canUseOn(int heroIndex) {
-        return usableHeroes.contains(heroIndex);
+    /** True if this item is used on enemies instead of heroes. */
+    public boolean targetsEnemies() {
+        return enemyTarget;
+    }
+
+    /** Whether the item would work on this position of its target side. */
+    public boolean canUseOn(int targetIndex) {
+        return usableTargets.contains(targetIndex);
     }
 }

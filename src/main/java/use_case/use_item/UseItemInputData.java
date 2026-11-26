@@ -2,18 +2,18 @@ package use_case.use_item;
 
 public class UseItemInputData {
     private final String itemName;
-    private final int heroIndex;
+    private final int targetIndex;
 
-    public UseItemInputData(String itemName, int heroIndex) {
+    public UseItemInputData(String itemName, int targetIndex) {
         this.itemName = itemName;
-        this.heroIndex = heroIndex;
+        this.targetIndex = targetIndex;
     }
 
     public String getItemName() {
         return itemName;
     }
 
-    public int getHeroIndex() {
-        return heroIndex;
+    public int getTargetIndex() {
+        return targetIndex;
     }
 }

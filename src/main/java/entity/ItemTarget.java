@@ -12,4 +12,13 @@ public interface ItemTarget {
 
     /** Adds HP without exceeding the maximum. */
     void restoreHp(int amount);
+
+    /** The stat's value right now, including any reductions. */
+    int getStat(Stat stat);
+
+    /** The stat's value before any reductions. */
+    int getBaseStat(Stat stat);
+
+    /** Lowers the stat by the given amount for the rest of the battle. */
+    void lowerStat(Stat stat, int amount);
 }

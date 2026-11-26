@@ -10,7 +10,7 @@ public class UseItemController {
         this.interactor = interactor;
     }
 
-    public void execute(String itemName, int heroIndex) {
-        interactor.execute(new UseItemInputData(itemName, heroIndex));
+    public void execute(String itemName, int targetIndex) {
+        interactor.execute(new UseItemInputData(itemName, targetIndex));
     }
 }

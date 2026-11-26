@@ -3,7 +3,10 @@ package use_case.use_item;
 import entity.Inventory;
 import entity.Item;
 import entity.ItemTarget;
+import entity.TargetSide;
 import use_case.ItemDataAccessInterface;
+
+import java.util.List;
 
 public class UseItemInteractor implements UseItemInputBoundary {
     private final ItemDataAccessInterface dataAccess;
@@ -31,8 +34,16 @@ public class UseItemInteractor implements UseItemInputBoundary {
             return;
         }
 
-        int heroIndex = inputData.getHeroIndex();
-        ItemTarget target = dataAccess.getHeroes().get(heroIndex);
+        List<? extends ItemTarget> side =
+                dataAccess.getSide(item.getTargetSide());
+        int targetIndex = inputData.getTargetIndex();
+
+        if (targetIndex < 0 || targetIndex >= side.size()) {
+            presenter.prepareFailView("Choose a valid target.");
+            return;
+        }
+
+        ItemTarget target = side.get(targetIndex);
 
         if (!item.canUse(target)) {
             presenter.prepareFailView(item.getName()
@@ -41,16 +52,15 @@ public class UseItemInteractor implements UseItemInputBoundary {
             return;
         }
 
-        int hpBefore = target.getHp();
-
         inventory.consume(item);
-        item.use(target);
+        String effect = item.use(target);
 
         presenter.prepareSuccessView(new UseItemOutputData(
                 dataAccess.getCurrentFighterName(),
                 item.getName(),
                 target.getName(),
-                target.getHp() - hpBefore,
-                heroIndex));
+                effect,
+                item.getTargetSide() == TargetSide.ENEMY,
+                targetIndex));
     }
 }

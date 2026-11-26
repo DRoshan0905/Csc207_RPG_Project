@@ -22,7 +22,8 @@ public class ViewItemsPresenter implements ViewItemsOutputBoundary {
                     entry.getName(),
                     entry.getDescription(),
                     "x" + entry.getCount(),
-                    entry.getUsableHeroes()));
+                    entry.isEnemyTarget(),
+                    entry.getUsableTargets()));
         }
 
         viewModel.setRows(rows);

@@ -75,7 +75,7 @@ public class Battle {
         // Basic damage calculation.
         int damage = Math.max(
                 1,
-                attacker.attack - target.defense / 2
+                attacker.getAttack() - target.getDefense() / 2
         );
 
         // Defending reduces damage.

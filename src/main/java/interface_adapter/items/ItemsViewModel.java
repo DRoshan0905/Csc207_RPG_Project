@@ -5,7 +5,7 @@ import java.beans.PropertyChangeSupport;
 import java.util.List;
 
 public class ItemsViewModel {
-    /** Fired after an item is used; the new value is the hero's index. */
+    /** Fired after an item is used; the new value is the target's index. */
     public static final String ITEM_USED = "itemUsed";
 
     private final PropertyChangeSupport support =
@@ -30,8 +30,8 @@ public class ItemsViewModel {
         this.message = message;
     }
 
-    public void fireItemUsed(int heroIndex) {
-        support.firePropertyChange(ITEM_USED, null, heroIndex);
+    public void fireItemUsed(int targetIndex) {
+        support.firePropertyChange(ITEM_USED, null, targetIndex);
     }
 
     public void addPropertyChangeListener(

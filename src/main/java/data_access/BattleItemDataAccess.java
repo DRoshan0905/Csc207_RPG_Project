@@ -28,6 +28,11 @@ public class BattleItemDataAccess implements ItemDataAccessInterface {
     }
 
     @Override
+    public List<? extends ItemTarget> getEnemies() {
+        return battle.enemies;
+    }
+
+    @Override
     public String getCurrentFighterName() {
         return battle.current().name;
     }
