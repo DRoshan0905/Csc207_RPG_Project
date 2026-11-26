@@ -3,6 +3,7 @@ package view;
 import data_access.GameAssets;
 import entity.Battle;
 import entity.Fighter;
+import interface_adapter.items.ItemsViewModel;
 import use_case.Combat;
 
 import javax.swing.*;
@@ -88,11 +89,22 @@ public class BattleView extends JPanel {
     private final Map<String, Combat.Action> actions;
 
     private boolean choosing;
-    private boolean items;
     private boolean hitApplied;
 
     private Point mouse = new Point(-1, -1);
     private int pressed = -1;
+
+    private static final String ITEMS = "Items";
+
+    // Combat actions followed by the Items button.
+    private final List<String> buttons;
+
+    private final ItemMenuView itemMenu;
+    private final ItemsViewModel itemsViewModel;
+    private final TurnMarker turnMarker = new TurnMarker();
+
+    private Fighter popupTarget;
+    private DamagePopup popup;
 
     private final float[] hover;
 
@@ -125,14 +137,26 @@ public class BattleView extends JPanel {
             GameAssets assets,
             Combat.Controller combatController,
             BattleViewModel viewModel,
-            Map<String, Combat.Action> actions) {
+            Map<String, Combat.Action> actions,
+            ItemMenuView itemMenu,
+            ItemsViewModel itemsViewModel) {
 
         this.assets = assets;
         this.battle = assets.battle;
         this.combatController = combatController;
         this.viewModel = viewModel;
         this.actions = actions;
-        this.hover = new float[actions.size()];
+        this.itemMenu = itemMenu;
+        this.itemsViewModel = itemsViewModel;
+
+        this.buttons = new ArrayList<>(actions.keySet());
+        this.buttons.add(ITEMS);
+
+        this.hover = new float[buttons.size()];
+
+        itemsViewModel.addPropertyChangeListener(
+                e -> itemUsed((int) e.getNewValue())
+        );
 
         setPreferredSize(new Dimension(WIDTH, HEIGHT));
         setBackground(new Color(10, 24, 34));
@@ -228,7 +252,7 @@ public class BattleView extends JPanel {
     }
 
     private int actionAt(Point point) {
-        for (int i = 0; i < actions.size(); i++) {
+        for (int i = 0; i < buttons.size(); i++) {
             if (actionBox(i).contains(point)) {
                 return i;
             }
@@ -251,7 +275,12 @@ public class BattleView extends JPanel {
 
         boolean hand = canAct()
                 && (over >= 0
-                || enemyAt(mouse) != null);
+                || (!itemMenu.isOpen()
+                && enemyAt(mouse) != null)
+                || (itemMenu.isOpen()
+                && itemMenu.contains(mouse, dialogueBox()))
+                || (itemMenu.hasSelection()
+                && heroAt(mouse) != null));
 
         setCursor(
                 Cursor.getPredefinedCursor(
@@ -269,12 +298,19 @@ public class BattleView extends JPanel {
 
         int action = actionAt(point);
 
+        if (itemMenu.isOpen() && action < 0) {
+            clickItems(point);
+            return;
+        }
+
         if (action >= 0) {
+            boolean wasOpen = itemMenu.isOpen();
+
             choosing = false;
-            items = false;
+            itemMenu.close();
 
             String actionName =
-                    new ArrayList<>(actions.keySet()).get(action);
+                    buttons.get(action);
 
             if (actionName.equals("Attack")
                     || actionName.equals("Skill")) {
@@ -305,6 +341,16 @@ public class BattleView extends JPanel {
                 );
 
                 finishTurn();
+
+            } else if (actionName.equals(ITEMS)) {
+
+                target = null;
+
+                if (wasOpen) {
+                    viewModel.setMessage(battle.prompt());
+                } else {
+                    itemMenu.open();
+                }
             }
 
             return;
@@ -322,7 +368,7 @@ public class BattleView extends JPanel {
                 );
 
             } else {
-                items = false;
+                itemMenu.close();
 
                 viewModel.setMessage(
                         "Target: "
@@ -331,6 +377,41 @@ public class BattleView extends JPanel {
                 );
             }
         }
+    }
+
+    private void clickItems(Point point) {
+        if (itemMenu.select(point, dialogueBox())) {
+            return;
+        }
+
+        Fighter hero = heroAt(point);
+
+        if (hero != null) {
+            itemMenu.useOn(battle.players.indexOf(hero));
+        }
+    }
+
+    private void itemUsed(int heroIndex) {
+        deaths.remove(battle.players.get(heroIndex));
+        viewModel.setMessage(itemsViewModel.getMessage());
+        finishTurn();
+    }
+
+    // Heroes can be picked by their card or their sprite.
+    private Fighter heroAt(Point point) {
+        for (int i = 0; i < battle.players.size(); i++) {
+            if (cardBox(i).contains(point)) {
+                return battle.players.get(i);
+            }
+        }
+
+        for (Fighter fighter : battle.players) {
+            if (targetBox(fighter).contains(point)) {
+                return fighter;
+            }
+        }
+
+        return null;
     }
 
     private Rectangle targetBox(Fighter fighter) {
@@ -420,7 +501,7 @@ public class BattleView extends JPanel {
         target = chosen;
 
         choosing = false;
-        items = false;
+        itemMenu.close();
         hitApplied = false;
 
         phase = 1;
@@ -471,6 +552,8 @@ public class BattleView extends JPanel {
 
                 hitApplied = true;
 
+                int hpBefore = victim.hp;
+
                 // Clean Architecture:
                 // View -> Controller -> Interactor
                 combatController.execute(
@@ -479,6 +562,12 @@ public class BattleView extends JPanel {
                 );
 
                 hitAt = now;
+
+                popupTarget = victim;
+                popup = new DamagePopup(
+                        hpBefore - victim.hp,
+                        victim.player
+                );
 
                 if (!victim.alive()) {
                     deaths.put(victim, now);
@@ -555,7 +644,7 @@ public class BattleView extends JPanel {
 
         target = null;
         choosing = false;
-        items = false;
+        itemMenu.close();
 
         viewModel.setMessage(
                 viewModel.getMessage()
@@ -702,6 +791,16 @@ public class BattleView extends JPanel {
         );
     }
 
+    private Rectangle dialogueBox() {
+
+        return new Rectangle(
+                20,
+                getHeight() - 142,
+                (int) (getWidth() * .36),
+                126
+        );
+    }
+
     private Rectangle cardBox(int index) {
 
         int left =
@@ -795,6 +894,10 @@ public class BattleView extends JPanel {
             drawFighter(g, fighter);
         }
 
+        if (popup != null) {
+            popup.draw(g, targetBox(popupTarget));
+        }
+
         drawTracker(g);
 
         for (int i = 0;
@@ -826,15 +929,7 @@ public class BattleView extends JPanel {
         drawTracker(g);
 
         Rectangle dialogue =
-                new Rectangle(
-                        20,
-                        getHeight() - 142,
-                        (int) (
-                                getWidth()
-                                        * .36
-                        ),
-                        126
-                );
+                dialogueBox();
 
         panel(
                 g,
@@ -842,14 +937,11 @@ public class BattleView extends JPanel {
                 ACCENT
         );
 
-        wrap(
-                g,
-                (items
-                        ? "ITEMS\n"
-                        : "")
-                        + viewModel.getMessage(),
-                dialogue
-        );
+        if (itemMenu.isOpen()) {
+            itemMenu.draw(g, dialogue, mouse);
+        } else {
+            wrap(g, viewModel.getMessage(), dialogue);
+        }
 
         g.dispose();
     }
@@ -863,7 +955,7 @@ public class BattleView extends JPanel {
                 canAct();
 
         List<String> actionNames =
-                new ArrayList<>(actions.keySet());
+                buttons;
 
         for (int i = 0;
              i < actionNames.size();
@@ -875,10 +967,14 @@ public class BattleView extends JPanel {
             float glow =
                     hover[i];
 
+            boolean itemsOpen =
+                    actionNames.get(i).equals(ITEMS)
+                            && itemMenu.isOpen();
+
             boolean selected =
                     enabled
-                            && i == 0
-                            && choosing;
+                            && (i == 0 && choosing
+                            || itemsOpen);
 
             Color top =
                     new Color(
@@ -978,7 +1074,9 @@ public class BattleView extends JPanel {
 
             text(
                     g,
-                    selected
+                    itemsOpen
+                            ? "Close items"
+                            : selected
                             ? "Choose target..."
                             : actionNames.get(i),
 
@@ -1117,6 +1215,17 @@ public class BattleView extends JPanel {
             if (phase == 3) {
                 mirror = !mirror;
             }
+        }
+
+        if (!battle.ended
+                && fighter == battle.current()) {
+
+            turnMarker.draw(
+                    g,
+                    point,
+                    targetBox(fighter).width,
+                    fighter.player
+            );
         }
 
         if (canAct()
@@ -1324,9 +1433,10 @@ public class BattleView extends JPanel {
                 g,
                 rectangle,
 
-                !battle.ended
+                (!battle.ended
                         && fighter
-                        == battle.current()
+                        == battle.current())
+                        || itemMenu.canUseOn(index)
 
                         ? ACCENT
                         : new Color(

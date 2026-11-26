@@ -2,6 +2,7 @@ package data_access;
 
 import entity.Battle;
 import entity.Fighter;
+import entity.Inventory;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -14,6 +15,11 @@ public class GameAssets {
     public BufferedImage background;
 
     public final Map<Fighter, Art> art = new HashMap<>();
+
+    public Inventory inventory;
+
+    // Icons by item name.
+    public final Map<String, BufferedImage> icons = new HashMap<>();
 
     public static class Art {
         public Clip idle;

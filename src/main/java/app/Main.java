@@ -6,10 +6,13 @@ import data_access.GameDataAccessObject;
 
 import entity.Battle;
 
+import interface_adapter.items.ItemsViewModel;
+
 import use_case.Combat;
 
 import view.BattleView;
 import view.BattleViewModel;
+import view.ItemMenuView;
 
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
@@ -72,12 +75,25 @@ public class Main {
                                 interactor
                         );
 
+                ItemsViewModel itemsViewModel =
+                        new ItemsViewModel();
+
+                ItemMenuView itemMenu =
+                        ItemMenuFactory.create(
+                                battle,
+                                assets.inventory,
+                                assets.icons,
+                                itemsViewModel
+                        );
+
                 BattleView view =
                         new BattleView(
                                 assets,
                                 controller,
                                 viewModel,
-                                actions
+                                actions,
+                                itemMenu,
+                                itemsViewModel
                         );
 
 

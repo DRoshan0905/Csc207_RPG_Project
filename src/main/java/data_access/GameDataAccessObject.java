@@ -37,10 +37,15 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class GameDataAccessObject implements GameDataAccessInterface {
 
-    private static final String ROOT =
+    private static final String PACKS =
             "https://raw.githubusercontent.com/"
                     + "sparklinlabs/superpowers-asset-packs/"
-                    + "master/rpg-battle-system/";
+                    + "master/";
+
+    private static final String ROOT = PACKS + "rpg-battle-system/";
+
+    // Paths starting with this come from another pack.
+    private static final String ITEM_PACK = "medieval-fantasy/";
 
     private static final Path CACHE =
             Path.of("superpowers-cache");
@@ -163,7 +168,39 @@ public class GameDataAccessObject implements GameDataAccessInterface {
 
         game.battle = new Battle(heroes, enemies);
 
+        ItemCatalog catalog = new ItemCatalog();
+
+        game.inventory = catalog.getInventory();
+
+        catalog.getIconPaths().forEach((name, path) -> {
+            // A missing icon should not prevent playing.
+            try {
+                game.icons.put(name, icon(path));
+            } catch (Exception exception) {
+                System.err.println(
+                        "No icon for " + name
+                                + ": " + exception.getMessage()
+                );
+            }
+        });
+
         return game;
+    }
+
+    // "sheet.png#2" means the third square of a horizontal sheet.
+    private BufferedImage icon(String path) throws Exception {
+        String[] parts = path.split("#");
+        BufferedImage source = image(parts[0]);
+
+        if (parts.length == 1) {
+            return source;
+        }
+
+        int size = source.getHeight();
+
+        return source.getSubimage(
+                Integer.parseInt(parts[1]) * size, 0, size, size
+        );
     }
 
     private Fighter createFighter(
@@ -226,7 +263,10 @@ public class GameDataAccessObject implements GameDataAccessInterface {
 
         HttpRequest request =
                 HttpRequest.newBuilder(
-                                URI.create(ROOT + relativePath))
+                                URI.create(
+                                        (relativePath.startsWith(ITEM_PACK)
+                                                ? PACKS : ROOT)
+                                                + relativePath))
                         .timeout(Duration.ofSeconds(45))
                         .header("User-Agent", "CSC207-RPG")
                         .GET()

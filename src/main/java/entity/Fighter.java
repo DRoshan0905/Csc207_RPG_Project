@@ -1,6 +1,6 @@
 package entity;
 
-public class Fighter {
+public class Fighter implements ItemTarget {
 
     public final String name;
     public final boolean player;
@@ -32,8 +32,29 @@ public class Fighter {
         this.guarding = false;
     }
 
+    @Override
     public boolean alive() {
         return hp > 0;
+    }
+
+    @Override
+    public String getName() {
+        return name;
+    }
+
+    @Override
+    public int getHp() {
+        return hp;
+    }
+
+    @Override
+    public int getMaxHp() {
+        return maxHp;
+    }
+
+    @Override
+    public void restoreHp(int amount) {
+        hp = Math.min(maxHp, hp + amount);
     }
 
     public void takeDamage(int damage) {
