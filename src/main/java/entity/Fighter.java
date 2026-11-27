@@ -12,6 +12,7 @@ public class Fighter implements ItemTarget {
 
     public int hp;
     public boolean guarding;
+    private int wavesCleared;
 
     public Fighter(
             String name,
@@ -49,12 +50,28 @@ public class Fighter implements ItemTarget {
 
     @Override
     public int getMaxHp() {
-        return maxHp;
+        return maxHp + 5 * wavesCleared;
+    }
+
+    public int getAttack() {
+        return attack + wavesCleared;
+    }
+
+    public int getDefense() {
+        return defense + wavesCleared;
+    }
+
+    public void advanceWave() {
+        wavesCleared++;
+        if (alive()) {
+            restoreHp(5);
+        }
+        stopDefending();
     }
 
     @Override
     public void restoreHp(int amount) {
-        hp = Math.min(maxHp, hp + amount);
+        hp = Math.min(getMaxHp(), hp + amount);
     }
 
     public void takeDamage(int damage) {
