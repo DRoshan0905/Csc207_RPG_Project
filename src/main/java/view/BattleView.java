@@ -693,10 +693,14 @@ public class BattleView extends JPanel {
                 fighter.player
                         ? HERO_HEIGHT
                         : ENEMY_HEIGHT
-        ) * multiplier;
+        ) * multiplier * (fighter.isBoss() ? 1.5 : 1.0);
     }
 
     private Point home(Fighter fighter) {
+
+        if (fighter.isBoss()) {
+            return new Point((int) (getWidth() * .24), (int) (getHeight() * .64));
+        }
 
         double[][] positions =
                 fighter.player

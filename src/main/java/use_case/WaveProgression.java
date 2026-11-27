@@ -14,10 +14,20 @@ public class WaveProgression {
 
         int wave = completed.getWave() + 1;
         int cleared = wave - 1;
+        boolean bossWave = wave % 2 == 0;
         List<Fighter> enemies = new ArrayList<>();
-        for (Fighter enemy : encounterEnemies) {
-            enemies.add(new Fighter(enemy.name, false, enemy.maxHp + 15 * cleared,
-                    enemy.attack + 3 * cleared, enemy.defense + 2 * cleared, enemy.speed));
+        List<Fighter> roster = bossWave ? List.of(encounterEnemies.get(0)) : encounterEnemies;
+        for (Fighter enemy : roster) {
+            int hp = enemy.maxHp + 15 * cleared;
+            int attack = enemy.attack + 3 * cleared;
+            String name = enemy.name;
+            if (bossWave) {
+                hp *= 2;
+                attack = (int) Math.ceil(attack * 1.25);
+                name += " Boss";
+            }
+            enemies.add(new Fighter(name, false, hp, attack,
+                    enemy.defense + 2 * cleared, enemy.speed, bossWave));
         }
         for (Fighter hero : completed.players) {
             hero.advanceWave();

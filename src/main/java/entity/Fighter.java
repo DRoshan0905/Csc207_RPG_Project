@@ -13,6 +13,7 @@ public class Fighter implements ItemTarget {
     public final int attack;
     public final int defense;
     public final int speed;
+    private final boolean boss;
 
     public int hp;
     public boolean guarding;
@@ -33,6 +34,10 @@ public class Fighter implements ItemTarget {
             int attack,
             int defense,
             int speed) {
+        this(name, player, maxHp, attack, defense, speed, false);
+    }
+
+    public Fighter(String name, boolean player, int maxHp, int attack, int defense, int speed, boolean boss) {
 
         this.name = name;
         this.player = player;
@@ -40,9 +45,14 @@ public class Fighter implements ItemTarget {
         this.attack = attack;
         this.defense = defense;
         this.speed = speed;
+        this.boss = boss;
 
         this.hp = maxHp;
         this.guarding = false;
+    }
+
+    public boolean isBoss() {
+        return boss;
     }
 
     @Override
