@@ -77,11 +77,15 @@ public class BattleView extends JPanel {
     private static final Color HP =
             new Color(69, 229, 154);
 
+    private static final Color BOSS_ACCENT = new Color(255, 194, 94);
+    private static final Color BOSS_HP = new Color(255, 114, 100);
+
     private static final Color PANEL =
             new Color(13, 36, 51, 185);
 
     private final GameAssets assets;
     private final Battle battle;
+    private final Fighter boss;
 
     private final Combat.Controller combatController;
     private final BattleViewModel viewModel;
@@ -145,6 +149,7 @@ public class BattleView extends JPanel {
 
         this.assets = assets;
         this.battle = assets.battle;
+        this.boss = battle.enemies.stream().filter(Fighter::isBoss).findFirst().orElse(null);
         this.combatController = combatController;
         this.viewModel = viewModel;
         this.actions = actions;
@@ -174,10 +179,9 @@ public class BattleView extends JPanel {
             cacheBody(fighter);
         }
 
-        viewModel.setMessage(
-                "An enemy group approaches!\n"
-                        + battle.prompt()
-        );
+        String entrance = boss == null ? "An enemy group approaches!"
+                : boss.name + " blocks your path!";
+        viewModel.setMessage(entrance + "\n" + battle.prompt());
 
         readyAt = System.currentTimeMillis();
 
@@ -917,14 +921,12 @@ public class BattleView extends JPanel {
             drawCard(g, i);
         }
 
-        text(
-                g,
-                "WAVE " + battle.getWave(),
-                24,
-                27,
-                17,
-                TEXT
-        );
+        if (boss == null) {
+            text(g, "WAVE " + battle.getWave(), 24, 27, 17, TEXT);
+        } else {
+            panel(g, new Rectangle(20, 8, 210, 29), BOSS_ACCENT);
+            text(g, "BOSS WAVE " + battle.getWave(), 30, 28, 17, BOSS_ACCENT);
+        }
 
         drawActions(g);
 
@@ -1290,6 +1292,11 @@ public class BattleView extends JPanel {
                 loop
         );
 
+        boolean bossFighter = fighter.isBoss();
+        if (bossFighter) {
+            panel(g, new Rectangle(point.x - 88, point.y + 9, 176, 38), BOSS_ACCENT);
+        }
+
         int nameWidth =
                 g.getFontMetrics(
                                 new Font(
@@ -1309,17 +1316,18 @@ public class BattleView extends JPanel {
                         - nameWidth / 2,
                 point.y + 26,
                 14,
-                TEXT
+                bossFighter ? BOSS_ACCENT : TEXT
         );
 
         if (!fighter.player) {
+            int barWidth = bossFighter ? 156 : 72;
 
             hpBar(
                     g,
-                    point.x - 36,
+                    point.x - barWidth / 2,
                     point.y + 33,
-                    72,
-                    5,
+                    barWidth,
+                    bossFighter ? 8 : 5,
                     fighter
             );
         }
@@ -1576,7 +1584,7 @@ public class BattleView extends JPanel {
                 height
         );
 
-        g.setColor(HP);
+        g.setColor(fighter.isBoss() ? BOSS_HP : HP);
 
         g.fillRect(
                 x,
