@@ -85,6 +85,7 @@ public class BattleView extends JPanel {
 
     private final Combat.Controller combatController;
     private final BattleViewModel viewModel;
+    private final Runnable onVictory;
 
     private final Map<String, Combat.Action> actions;
 
@@ -139,7 +140,8 @@ public class BattleView extends JPanel {
             BattleViewModel viewModel,
             Map<String, Combat.Action> actions,
             ItemMenuView itemMenu,
-            ItemsViewModel itemsViewModel) {
+            ItemsViewModel itemsViewModel,
+            Runnable onVictory) {
 
         this.assets = assets;
         this.battle = assets.battle;
@@ -148,6 +150,7 @@ public class BattleView extends JPanel {
         this.actions = actions;
         this.itemMenu = itemMenu;
         this.itemsViewModel = itemsViewModel;
+        this.onVictory = onVictory;
 
         this.buttons = new ArrayList<>(actions.keySet());
         this.buttons.add(ITEMS);
@@ -519,7 +522,7 @@ public class BattleView extends JPanel {
 
     private void update() {
 
-        if (battle.ended) {
+        if (battle.ended && phase == 0) {
             return;
         }
 
@@ -654,6 +657,9 @@ public class BattleView extends JPanel {
 
         readyAt =
                 System.currentTimeMillis();
+        if (battle.isVictory()) {
+            onVictory.run();
+        }
     }
 
     // ---------- POSITIONING ----------
@@ -909,7 +915,7 @@ public class BattleView extends JPanel {
 
         text(
                 g,
-                "ENCOUNTER",
+                "WAVE " + battle.getWave(),
                 24,
                 27,
                 17,
@@ -1507,7 +1513,7 @@ public class BattleView extends JPanel {
                 g,
                 fighter.hp
                         + " / "
-                        + fighter.maxHp
+                        + fighter.getMaxHp()
                         + " HP",
 
                 rectangle.x + 9,
@@ -1519,9 +1525,9 @@ public class BattleView extends JPanel {
         text(
                 g,
                 "ATK "
-                        + fighter.attack
+                        + fighter.getAttack()
                         + "  DEF "
-                        + fighter.defense,
+                        + fighter.getDefense(),
 
                 rectangle.x + 9,
                 rectangle.y + 100,
@@ -1576,7 +1582,7 @@ public class BattleView extends JPanel {
                         width
                                 * fighter.hp
                                 / (double)
-                                fighter.maxHp
+                                fighter.getMaxHp()
                 ),
 
                 height
