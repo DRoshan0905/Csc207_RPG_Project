@@ -3,6 +3,7 @@ package entity;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Random;
 
 public class Battle {
 
@@ -13,6 +14,7 @@ public class Battle {
 
     private int turnIndex;
     private final int wave;
+    private final Random buffRandom;
 
     public boolean ended;
 
@@ -24,10 +26,15 @@ public class Battle {
     }
 
     public Battle(List<Fighter> players, List<Fighter> enemies, int wave) {
+        this(players, enemies, wave, new Random());
+    }
+
+    Battle(List<Fighter> players, List<Fighter> enemies, int wave, Random buffRandom) {
 
         this.players = players;
         this.enemies = enemies;
         this.wave = wave;
+        this.buffRandom = buffRandom;
 
         this.turnOrder = new ArrayList<>();
 
@@ -112,6 +119,12 @@ public class Battle {
             message += "\n"
                     + target.name
                     + " was defeated!";
+            if (attacker.player && enemies.contains(target)) {
+                String reward = attacker.recordFinishingBlow(buffRandom);
+                if (!reward.isEmpty()) {
+                    message += "\n" + reward;
+                }
+            }
         }
 
         updateBattleState();
