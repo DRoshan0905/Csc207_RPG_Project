@@ -21,6 +21,20 @@ public class GameAssets {
     // Icons by item name.
     public final Map<String, BufferedImage> icons = new HashMap<>();
 
+    public void useNextBattle(Battle next, GameAssets previous) {
+        Map<Fighter, Art> nextArt = new HashMap<>();
+        for (Fighter hero : next.players) {
+            nextArt.put(hero, previous.art.get(hero));
+        }
+        for (int i = 0; i < next.enemies.size(); i++) {
+            nextArt.put(next.enemies.get(i), art.get(battle.enemies.get(i)));
+        }
+        art.clear();
+        art.putAll(nextArt);
+        battle = next;
+        inventory = previous.inventory;
+    }
+
     public static class Art {
         public Clip idle;
         public Clip move;

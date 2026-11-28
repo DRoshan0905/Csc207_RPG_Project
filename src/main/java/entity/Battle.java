@@ -3,6 +3,7 @@ package entity;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Random;
 
 public class Battle {
 
@@ -12,6 +13,8 @@ public class Battle {
     private final List<Fighter> turnOrder;
 
     private int turnIndex;
+    private final int wave;
+    private final Random buffRandom;
 
     public boolean ended;
 
@@ -19,9 +22,19 @@ public class Battle {
     public Battle(
             List<Fighter> players,
             List<Fighter> enemies) {
+        this(players, enemies, 1);
+    }
+
+    public Battle(List<Fighter> players, List<Fighter> enemies, int wave) {
+        this(players, enemies, wave, new Random());
+    }
+
+    Battle(List<Fighter> players, List<Fighter> enemies, int wave, Random buffRandom) {
 
         this.players = players;
         this.enemies = enemies;
+        this.wave = wave;
+        this.buffRandom = buffRandom;
 
         this.turnOrder = new ArrayList<>();
 
@@ -41,6 +54,14 @@ public class Battle {
         skipDeadFighters();
     }
 
+    public int getWave() {
+        return wave;
+    }
+
+    public boolean isVictory() {
+        return ended && players.stream().anyMatch(Fighter::alive)
+                && enemies.stream().noneMatch(Fighter::alive);
+    }
 
     // --------------------------------------------------
     // CURRENT TURN
@@ -75,7 +96,7 @@ public class Battle {
         // Basic damage calculation.
         int damage = Math.max(
                 1,
-                attacker.attack - target.defense / 2
+                attacker.getAttack() - target.getDefense() / 2
         );
 
         // Defending reduces damage.
@@ -98,6 +119,12 @@ public class Battle {
             message += "\n"
                     + target.name
                     + " was defeated!";
+            if (attacker.player && enemies.contains(target)) {
+                String reward = attacker.recordFinishingBlow(buffRandom);
+                if (!reward.isEmpty()) {
+                    message += "\n" + reward;
+                }
+            }
         }
 
         updateBattleState();
